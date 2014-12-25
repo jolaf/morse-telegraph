@@ -6,7 +6,6 @@ from collections import deque
 from functools import partial
 from getopt import getopt
 from logging import getLogger, getLoggerClass, setLoggerClass, FileHandler, Formatter, Handler, INFO, NOTSET
-from os import getcwd
 from sys import argv, exit # pylint: disable=W0622
 from time import sleep
 from traceback import format_exc
@@ -21,6 +20,9 @@ except ImportError as ex:
 from UARTTextProtocol import Command, COMMAND_MARKER
 from UARTTextCommands import ackResponse, morseBeep
 from SerialPort import SerialPort, DT, TIMEOUT
+
+# ToDo
+# Load B25 or other similar font for messages: http://qt-project.org/forums/viewthread/12741
 
 LONG_DATETIME_FORMAT = 'yyyy.MM.dd hh:mm:ss'
 
@@ -125,13 +127,7 @@ class MorseControl(QMainWindow):
             elif option in ('-r', '--reset'):
                 self.needLoadSettings = False
         # Setting variables
-        self.title = self.windowTitle()
-        self.fileName = None
-        self.programChanged = False
-        self.currentDirectory = getcwd()
-        self.recentFiles = deque(maxlen = 9)
         self.port = None
-        self.allowHardwareUpdate = False
         # Setting window size
         resolution = QDesktopWidget().screenGeometry()
         width = resolution.width()
@@ -139,12 +135,9 @@ class MorseControl(QMainWindow):
         self.setGeometry(width * WINDOW_POSITION, height * WINDOW_POSITION, width * WINDOW_SIZE, height * WINDOW_SIZE)
         # Configuring widgets
         self.portLabel.configure()
+        self.consoleControlButton.configure(self.advanced, self.logTextEdit, self.consoleEdit)
         self.resetButton.clicked.connect(self.reset)
         self.consoleEdit.configure(self.consoleEnter)
-        self.newAction.triggered.connect(self.newFile)
-        self.openAction.triggered.connect(self.openFile)
-        self.saveAction.triggered.connect(self.saveFile)
-        self.saveAsAction.triggered.connect(self.saveFileAs)
         self.aboutDialog = AboutDialog()
         self.aboutAction.triggered.connect(self.aboutDialog.exec_)
         self.aboutQtAction.triggered.connect(partial(QMessageBox.aboutQt, self, "About Qt"))
@@ -162,7 +155,6 @@ class MorseControl(QMainWindow):
         self.logger.info("start")
         # Starting up!
         self.loadSettings()
-        self.allowHardwareUpdate = True
         self.comConnect.connect(self.processConnect)
         self.port = SerialPort(self.logger, morseBeep.prefix, ackResponse.prefix,
                                self.comConnect.emit, None, self.portLabel.setPortStatus.emit,
@@ -171,6 +163,13 @@ class MorseControl(QMainWindow):
             self.showMaximized()
         else:
             self.show()
+
+    def askForExit(self):
+        if True: # ToDo: Make a proper check for unsent message
+            return True
+        messageBox = QMessageBox(QMessageBox.Question, "Редактируемая телеграмма не была отправлена.",
+                "Вы уверены, что хотите выйти?", QMessageBox.Yes | QMessageBox.No, self)
+        return messageBox.exec_() == QMessageBox.Yes
 
     def processConnect(self, pong):
         if self.onConnectButtonGroup.checkedButton() is self.onConnectSetColorButton:
@@ -209,7 +208,7 @@ class MorseControl(QMainWindow):
             self.port.write(data)
 
     def closeEvent(self, event):
-        if self.askForSave():
+        if self.askForExit():
             self.saveSettings()
             self.logger.info("close")
         else:

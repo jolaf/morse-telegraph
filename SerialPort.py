@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
-# Mesh Console
+# Morse Console
 # Serial port operation routines
 #
 from collections import deque
@@ -94,7 +94,7 @@ class SerialPort(object):
         while True:
             while self.port:
                 sleep(DT)
-            self.statusUpdate("SCAN", self.TRYING)
+            self.statusUpdate("СКАН", self.TRYING)
             sleep(DT)
             portNames = (self.externalPort.name,) if self.externalPort else tuple(portName for (portName, _description, _address) in comports())
             if portNames:

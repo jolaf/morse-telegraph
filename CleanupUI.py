@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+
 from os import listdir
 from re import compile as reCompile
 
-PROCESSOR = reCompile('(?is)([\t ]*(?:<hints>.*?</hints>|<property name="sizeHint".*?</property>|<property name="geometry">.*?</property>)[\n\r]*)')
+PROCESSOR = reCompile('(?is)([\t ]*(?:<hints>.*?</hints>|<property name="sizeHint">.*?</property>|<property name="geometry">.*?</property>)[\n\r]*)')
 
 def main():
     fileNames = tuple(fileName for fileName in listdir() if fileName.lower().endswith('.ui'))
