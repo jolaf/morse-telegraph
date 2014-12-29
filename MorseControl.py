@@ -20,14 +20,22 @@ except ImportError as ex:
 from UARTTextProtocol import Command, COMMAND_MARKER
 from UARTTextCommands import ackResponse, morseBeep
 from SerialPort import SerialPort, DT, TIMEOUT
+from MorseWidgets import MessageFrame
 
 # ToDo
 # Load B25 or other similar font for messages: http://qt-project.org/forums/viewthread/12741
+# Change main container to Split instead of Grid
+# Fix segmentation faults - do not hold references to Qt objects
 
 LONG_DATETIME_FORMAT = 'yyyy.MM.dd hh:mm:ss'
 
 MAIN_UI_FILE_NAME = 'MorseControl.ui'
+MESSAGE_UI_FILE_NAME = 'MorseMessage.ui'
+
 ABOUT_UI_FILE_NAME = 'AboutMC.ui'
+
+DATA_FILE_NAME = 'MorseControl.msg'
+TEXT_FILE_NAME = 'MorseControl.txt'
 
 LOG_FILE_NAME = 'MorseControl.log'
 
@@ -36,7 +44,7 @@ WINDOW_POSITION = (1 - WINDOW_SIZE) / 2
 
 class CallableHandler(Handler):
     def __init__(self, emitCallable, level = NOTSET):
-        Handler.__init__(self, level)
+        super().__init__(level)
         self.emitCallable = emitCallable
 
     def emit(self, record):
@@ -49,8 +57,8 @@ class EventLogger(getLoggerClass(), QObject):
         QObject.__init__(self, parent)
         self.logSignal.connect(self.doLog)
 
-    def doLog(self, args, kwargs):
-        super(EventLogger, self)._log(*args, **kwargs)
+    def doLog(self, args, kwargs): # pylint: disable=R0201
+        super()._log(*args, **kwargs)
 
     def _log(self, *args, **kwargs):
         self.logSignal.emit(args, kwargs)
@@ -87,7 +95,7 @@ class EmulatedSerial(object):
 
 class AboutDialog(QDialog):
     def __init__(self):
-        QDialog.__init__(self)
+        super().__init__()
         uic.loadUi(ABOUT_UI_FILE_NAME, self)
 
 class PortLabel(QLabel):
@@ -112,7 +120,7 @@ class MorseControl(QMainWindow):
     comConnect = pyqtSignal(str)
 
     def __init__(self, args):
-        QMainWindow.__init__(self)
+        super().__init__()
         uic.loadUi(MAIN_UI_FILE_NAME, self)
         # Processing command line options
         self.advanced = False
@@ -153,8 +161,11 @@ class MorseControl(QMainWindow):
         self.logger = getLogger('MorseControl')
         self.logger.configure(self) # pylint: disable=E1103
         self.logger.info("start")
+        # Loading messages
+        MessageFrame.configure(MESSAGE_UI_FILE_NAME, self.messageHistoryWidget)
         # Starting up!
         self.loadSettings()
+        self.loadData()
         self.comConnect.connect(self.processConnect)
         self.port = SerialPort(self.logger, morseBeep.prefix, ackResponse.prefix,
                                self.comConnect.emit, None, self.portLabel.setPortStatus.emit,
@@ -218,6 +229,21 @@ class MorseControl(QMainWindow):
         self.logger.info("reset")
         self.port.reset()
 
+    @staticmethod
+    def saveData():
+        with open(DATA_FILE_NAME, 'w') as dataFile, open(TEXT_FILE_NAME, 'w') as textFile:
+            MessageFrame.writeData(dataFile, textFile)
+
+    @staticmethod
+    def loadData():
+        try:
+            dataFile = open(DATA_FILE_NAME)
+        except OSError:
+            dataFile = None
+        MessageFrame.readData(dataFile)
+        if dataFile:
+            dataFile.close()
+
     def saveSettings(self):
         settings = QSettings()
         try:
@@ -244,7 +270,10 @@ class MorseControl(QMainWindow):
         if self.needLoadSettings:
             self.logger.info("Loading settings from %s", settings.fileName())
             try:
-                timeStamp = settings.value('timeStamp', type = str)
+                try:
+                    timeStamp = settings.value('timeStamp', type = str)
+                except TypeError:
+                    timeStamp = None
                 if timeStamp:
                     settings.beginGroup('window')
                     self.resize(settings.value('width', type = int), settings.value('height', type = int))

@@ -137,7 +137,7 @@
        <bool>true</bool>
       </property>
       <widget class="QWidget" name="messageHistoryWidget">
-       <layout class="QVBoxLayout" name="historyWidgetLayout">
+       <layout class="QVBoxLayout" name="messageHistoryLayout">
         <property name="spacing">
          <number>0</number>
         </property>
@@ -154,75 +154,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="MessageWidget" name="messageWidget" native="true">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <layout class="QVBoxLayout" name="historyItemLayout">
-           <property name="leftMargin">
-            <number>0</number>
-           </property>
-           <property name="topMargin">
-            <number>0</number>
-           </property>
-           <property name="rightMargin">
-            <number>0</number>
-           </property>
-           <property name="bottomMargin">
-            <number>0</number>
-           </property>
-           <item>
-            <layout class="QHBoxLayout" name="messageHeaderLayout">
-             <item>
-              <widget class="QLabel" name="messageTypeLabel">
-               <property name="font">
-                <font>
-                 <weight>75</weight>
-                 <bold>true</bold>
-                </font>
-               </property>
-               <property name="text">
-                <string>Входящее</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="messageDateLabel">
-               <property name="text">
-                <string>2014.03.31 16:52:09</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="messageHeaderSpacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>0</width>
-                 <height>0</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <widget class="QLineEdit" name="lineEdit">
-             <property name="text">
-              <string/>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <spacer name="historySpacer">
+         <spacer name="messageHistorySpacer">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
           </property>
@@ -270,7 +202,7 @@
     <string>Закрыть приложение</string>
    </property>
    <property name="shortcut">
-    <string>Alt-F4</string>
+    <string/>
    </property>
   </action>
   <action name="aboutAction">
@@ -304,12 +236,6 @@
   <customwidget>
    <class>VerticalScrollArea</class>
    <extends>QScrollArea</extends>
-   <header>MorseWidgets</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>MessageWidget</class>
-   <extends>QWidget</extends>
    <header>MorseWidgets</header>
    <container>1</container>
   </customwidget>
