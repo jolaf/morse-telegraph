@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from collections import Counter
 from itertools import chain
-from re import split
+from re import compile as reCompile
 from unittest import main, TestCase
 
 DOT = b'.'
@@ -19,17 +19,18 @@ SPACE = ' '
 bSPACE = b' '
 WORD_SPACE = 3 * bSPACE
 
-DIT = '1'
-DAH = '111'
-PAUSE = '0'
+DIT = b'1'
+DAH = b'111'
+PAUSE = b'0'
 DIT_PAUSE = set(DIT + PAUSE)
+TOKENIZER = reCompile(b'(' + DIT + b'+)')
 
 BITS_PER_DIT = 3
 
 CODE_TO_BITS = {
     DOT: DIT,
     DASH: DAH,
-    SPACE: PAUSE
+    bSPACE: PAUSE
 }
 
 RUSSIAN_CODES = {
@@ -191,13 +192,14 @@ class Morse(object):
         return ' '.join(ret)
 
     def encodeMessage(self, message, defaultCode = None):
-        return self.encodePhrase(chain((START,), message, (END,)), defaultCode)
+        return self.encodePhrase(' '.join((START, message, END)), defaultCode)
 
     def decodeMessage(self, codePhrase, defaultChar = None):
         return self.decodePhrase(codePhrase, defaultChar)
 
     def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT):
-        return DIT * (2 * self.maxCodeLength) + PAUSE.join(CODE_TO_BITS[c] * bitsPerDit for c in codePhrase)
+        print(repr(codePhrase))
+        return DIT * (2 * self.maxCodeLength) + PAUSE.join(CODE_TO_BITS[bytes((c,))] * bitsPerDit for c in codePhrase)
 
     @staticmethod
     def bitsToCode(bits):
@@ -206,7 +208,7 @@ class Morse(object):
             lengths = tuple(k for (k, v) in sorted(counter.items(), key = lambda k_v: -k_v[1])[:number])
             return sorted(lengths) + [0,] * (number - len(lengths))
         assert set(bits) == DIT_PAUSE
-        tokens = split('(%s+)' % DIT, bits)
+        tokens = TOKENIZER.split(bits)
         if not tokens:
             return b''
         (zero1, zero3, zero7) = nMax(tokens, PAUSE, 3)
@@ -221,9 +223,42 @@ class Morse(object):
             length = len(token)
             if token[0] == DIT:
                 ret.append(DOT if length <= maxDit else DASH)
-            elif len(token) > maxDit:
+            elif length > maxDit:
                 ret.append(bSPACE if len(token) <= maxDash else WORD_SPACE)
         return b''.join(ret)
+
+    def parseBits(self, bits):
+        def nMax(tokens, typ, number):
+            counter = Counter(len(t) for t in tokens if t and t[0] == typ)
+            lengths = tuple(k for (k, v) in sorted(counter.items(), key = lambda k_v: -k_v[1])[:number])
+            return sorted(lengths) + [0,] * (number - len(lengths))
+        assert set(bits) <= DIT_PAUSE
+        tokens = TOKENIZER.split(bits)
+        if not tokens:
+            return ()
+        (zero1, zero3, zero7) = nMax(tokens, PAUSE, 3)
+        zero3 = zero3 or 3 * zero1
+        zero7 = zero7 or zero3 * 7 // 3
+        (one1, one3) = nMax(tokens, DIT, 2)
+        one3 = one3 or one1 * 3
+        maxDit = (one1 + zero1 + one3 + zero3) // 4
+        maxDash = (one3 + zero3 + 2 * zero7) // 4
+        ret = []
+        groupBits = []
+        groupCode = []
+        for token in chain(tokens, (b'',)):
+            length = len(token)
+            if token and token[0] == DIT:
+                groupBits.append(token)
+                groupCode.append(DOT if length <= maxDit else DASH)
+            elif length and length <= maxDit:
+                groupBits.append(token)
+            else:
+                code = b''.join(groupCode)
+                ret.append((b''.join(groupBits), code, self.decodeSymbol(code) if code else ''))
+                if length: # not the last token
+                    ret.append((token, bSPACE if len(token) <= maxDash else WORD_SPACE, ''))
+        return tuple(ret)
 
     def messageToBits(self, message):
         return self.codeToBits(self.encodeMessage(message))

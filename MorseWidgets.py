@@ -71,6 +71,7 @@ class MessageFrame(QFrame):
     SENT = 1
     RECEIVED = 2
     STATE_MARKS = '!><'
+    STATES = []
 
     @classmethod
     def configure(cls, uiFile, parentWidget):
@@ -96,7 +97,7 @@ class MessageFrame(QFrame):
                 assert len(tokens) == 1
                 self.timeStamp = None
                 text = next(reader)
-                self.bits = self.morse.messageToBits(self.text)
+                self.bits = self.morse.messageToBits(text)
             else:
                 assert len(tokens) == 2
                 self.timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
@@ -108,6 +109,8 @@ class MessageFrame(QFrame):
             self.bits = b''
             text = ''
         uic.loadUi(self.uiFile, self)
+        if not self.STATES:
+            self.STATES.extend(label.text() for label in (self.outgoingLabel, self.sentLabel, self.receivedLabel))
         # self.textEdit.setPlaceholderText("Вводите текст сообщения для отправки здесь") # ToDo: Add in Designer after moving to Qt 5.3+
         self.stateStackedWidget.setCurrentIndex(self.state)
         self.controlStackedWidget.setCurrentIndex(self.state)
@@ -122,19 +125,24 @@ class MessageFrame(QFrame):
         self.timeLabel.setText(self.timeStamp.strftime(self.DISPLAY_TIME_FORMAT) if self.timeStamp else '')
 
     def setBits(self):
-        pass
+        for widget in widgets(self.bitsGridLayout):
+            widget.setParent(None)
+        for (i, (bits, code, char)) in enumerate(self.morse.parseBits(self.bits)):
+            self.bitsGridLayout.addWidget(QLabel(str(bits), self), 0, i)
+            self.bitsGridLayout.addWidget(QLabel(str(code), self), 1, i)
+            self.bitsGridLayout.addWidget(QLabel(char, self), 2, i)
 
     def dataStr(self):
         state = self.STATE_MARKS[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.text)
+            return '%s\n%s\n' % (state, self.textEdit.toPlainText())
         else:
             return '%s\n%s\n%s\n' % (b' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), self.textEdit.toPlainText(), self.bits)
 
     def textStr(self):
-        state = self.stateStackedWidget.findChildren(QLabel)[self.state].text()
+        state = self.STATES[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.text)
+            return '%s\n%s\n' % (state, self.textEdit.toPlainText())
         else:
             return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.textEdit.toPlainText())
 
@@ -152,10 +160,11 @@ class MessageFrame(QFrame):
     def readData(cls, dataFile):
         for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
             widget.setParent(None)
-        MessageFrame()
         if dataFile:
             try:
                 while True:
                     MessageFrame(dataFile)
             except StopIteration:
                 pass
+        if cls.parentLayout.count() <= cls.HEAD_SIZE + cls.TAIL_SIZE:
+            MessageFrame()

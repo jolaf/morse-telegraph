@@ -233,7 +233,7 @@ class MorseControl(QMainWindow):
 
     @staticmethod
     def saveData():
-        with open(DATA_FILE_NAME, 'w') as dataFile, open(TEXT_FILE_NAME, 'w') as textFile:
+        with open(DATA_FILE_NAME, 'w', newline = '\r\n') as dataFile, open(TEXT_FILE_NAME, 'w', newline = '\r\n') as textFile:
             MessageFrame.writeData(dataFile, textFile)
 
     @staticmethod
