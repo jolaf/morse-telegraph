@@ -2,14 +2,6 @@
 <ui version="4.0">
  <class>messageFrame</class>
  <widget class="QFrame" name="messageFrame">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>484</width>
-    <height>159</height>
-   </rect>
-  </property>
   <property name="frameShape">
    <enum>QFrame::StyledPanel</enum>
   </property>
@@ -20,39 +12,10 @@
    <item>
     <layout class="QHBoxLayout" name="headerLayout" stretch="0,0,1,0">
      <item>
-      <widget class="QStackedWidget" name="directionStackedWidget">
+      <widget class="QStackedWidget" name="stateStackedWidget">
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
-       <widget class="QWidget" name="incomingPage">
-        <layout class="QHBoxLayout" name="incomingLayout">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QLabel" name="incomingLabel">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="text">
-            <string>Входящее</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
        <widget class="QWidget" name="outgoingPage">
         <layout class="QHBoxLayout" name="outgoingLayout">
          <property name="leftMargin">
@@ -76,7 +39,65 @@
             </font>
            </property>
            <property name="text">
-            <string>Исходящее</string>
+            <string>Исходящая</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="sentPage">
+        <layout class="QHBoxLayout" name="sentLayout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="sentLabel">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Отправленная</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="receivedPage">
+        <layout class="QHBoxLayout" name="receivedLayout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QLabel" name="receivedLabel">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Полученная</string>
            </property>
           </widget>
          </item>
@@ -92,99 +113,13 @@
       </widget>
      </item>
      <item>
-      <widget class="QWidget" name="horizontalSpacer" native="true"/>
+      <widget class="QWidget" name="headerSpacer" native="true"/>
      </item>
      <item>
       <widget class="QStackedWidget" name="controlStackedWidget">
        <property name="currentIndex">
-        <number>3</number>
+        <number>0</number>
        </property>
-       <widget class="QWidget" name="viewIncomingControlPage">
-        <layout class="QHBoxLayout" name="viewIncomingControlLayout">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QPushButton" name="editIncomingButton">
-           <property name="text">
-            <string>Edit</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="deleteIncomingButton">
-           <property name="text">
-            <string>Delete</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-       <widget class="QWidget" name="viewOutgoingControlPage">
-        <layout class="QHBoxLayout" name="viewOutgoingControlLayout">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QWidget" name="viewOutgoingSpacer" native="true"/>
-         </item>
-         <item>
-          <widget class="QPushButton" name="deleteOutgoingButton">
-           <property name="text">
-            <string>Delete</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-       <widget class="QWidget" name="editIncomingControlPage">
-        <layout class="QHBoxLayout" name="editIncomingControlLayout">
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <widget class="QPushButton" name="cancelIncomingButton">
-           <property name="text">
-            <string>Cancel</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="saveIncomingButton">
-           <property name="text">
-            <string>Save</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
        <widget class="QWidget" name="editOutgoingControlPage">
         <layout class="QHBoxLayout" name="editOutgoingControlLayout">
          <property name="leftMargin">
@@ -200,9 +135,9 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QPushButton" name="cancelOutgoingButton">
+          <widget class="QPushButton" name="resetOutgoingButton">
            <property name="text">
-            <string>Cancel</string>
+            <string>Reset</string>
            </property>
           </widget>
          </item>
@@ -210,6 +145,92 @@
           <widget class="QPushButton" name="sendOutgoingButton">
            <property name="text">
             <string>Send</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="viewSentControlPage">
+        <layout class="QHBoxLayout" name="viewOutgoingControlLayout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QWidget" name="viewSentControlSpacer" native="true"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="deleteSentButton">
+           <property name="text">
+            <string>Delete</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="viewReceivedControlPage">
+        <layout class="QHBoxLayout" name="viewIncomingControlLayout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="editReceivedButton">
+           <property name="text">
+            <string>Edit</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="deleteReceivedButton">
+           <property name="text">
+            <string>Delete</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="editReceivedControlPage">
+        <layout class="QHBoxLayout" name="editIncomingControlLayout">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item>
+          <widget class="QPushButton" name="cancelReceivedButton">
+           <property name="text">
+            <string>Cancel</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="saveReceivedButton">
+           <property name="text">
+            <string>Save</string>
            </property>
           </widget>
          </item>

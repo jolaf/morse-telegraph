@@ -225,6 +225,9 @@ class Morse(object):
                 ret.append(bSPACE if len(token) <= maxDash else WORD_SPACE)
         return b''.join(ret)
 
+    def messageToBits(self, message):
+        return self.codeToBits(self.encodeMessage(message))
+
 class MorseTest(TestCase):
     def setUp(self):
         self.morse = Morse()

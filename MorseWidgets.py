@@ -7,10 +7,11 @@ from datetime import datetime
 try:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt
-    from PyQt5.QtGui import QTextDocument
-    from PyQt5.QtWidgets import QFrame, QLineEdit, QPushButton, QScrollArea
+    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPushButton, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
+
+from Morse import Morse
 
 def fixWidgetSize(widget, adjustment = 1):
     widget.setFixedWidth(widget.fontMetrics().boundingRect(widget.text()).width() * adjustment) # This is a bad hack, but there's no better idea
@@ -62,15 +63,21 @@ class VerticalScrollArea(QScrollArea):
         QScrollArea.resizeEvent(self, event)
 
 class MessageFrame(QFrame):
+    HEAD_SIZE = 0
+    TAIL_SIZE = 1
     STORE_DATETIME_FORMAT = '%Y%m%d-%H%M%S'
     DISPLAY_TIME_FORMAT = '%d %b %Y, %H:%M:%S'
-    DIRECTIONS = ("Входящее", "Исходящее")
+    OUTGOING = 0
+    SENT = 1
+    RECEIVED = 2
+    STATE_MARKS = '!><'
 
     @classmethod
     def configure(cls, uiFile, parentWidget):
         cls.uiFile = uiFile
         cls.parentWidget = parentWidget
         cls.parentLayout = parentWidget.layout()
+        cls.morse = Morse()
 
     @staticmethod
     def streamReader(stream): # generator
@@ -83,44 +90,67 @@ class MessageFrame(QFrame):
         super().__init__(self.parentWidget)
         if stream:
             reader = self.streamReader(stream)
-            (typ, timeStamp, bits) = reader.readline().split()
-            self.isOutgoing = (typ == b'>')
-            self.timeStamp = datetime.strptime(timeStamp, self.STORE_DATETIME_FORMAT)
-            self.bits = bits
-            self.text = reader.readline()
+            tokens = next(reader).split()
+            self.state = self.STATE_MARKS.index(tokens[0])
+            if self.state == self.OUTGOING:
+                assert len(tokens) == 1
+                self.timeStamp = None
+                text = next(reader)
+                self.bits = self.morse.messageToBits(self.text)
+            else:
+                assert len(tokens) == 2
+                self.timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
+                self.bits = next(reader)
+                text = next(reader)
         else:
-            self.isOutgoing = True
+            self.state = self.OUTGOING
             self.timeStamp = None
             self.bits = b''
-            self.text = ''
+            text = ''
         uic.loadUi(self.uiFile, self)
         # self.textEdit.setPlaceholderText("Вводите текст сообщения для отправки здесь") # ToDo: Add in Designer after moving to Qt 5.3+
-        self.directionStackedWidget.setCurrentIndex(self.isOutgoing)
-        self.controlStackedWidget.setCurrentIndex(self.isOutgoing if stream else self.controlStackedWidget.indexOf(self.editOutgoingControlPage))
-        if self.text:
-            self.textEdit.setDocument(QTextDocument(self.text))
+        self.stateStackedWidget.setCurrentIndex(self.state)
+        self.controlStackedWidget.setCurrentIndex(self.state)
         self.setTime()
+        self.setBits()
+        self.textEdit.setPlainText(text)
+        self.parentLayout.insertWidget(self.parentLayout.count() - self.TAIL_SIZE, self)
         if not stream:
             self.textEdit.setFocus()
 
     def setTime(self):
         self.timeLabel.setText(self.timeStamp.strftime(self.DISPLAY_TIME_FORMAT) if self.timeStamp else '')
 
+    def setBits(self):
+        pass
+
     def dataStr(self):
-        return '%s\n%s\n' % (b' '.join(('>' if self.outgoing else '<', self.timeStamp.strftime(self.STORE_DATETIME_FORMAT), self.bits)), self.text)
+        state = self.STATE_MARKS[self.state]
+        if self.state is self.OUTGOING:
+            return '%s\n%s\n' % (state, self.text)
+        else:
+            return '%s\n%s\n%s\n' % (b' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), self.textEdit.toPlainText(), self.bits)
 
     def textStr(self):
-        return '%s\n%s\n' % (b' '.join(('>' if self.outgoing else '<', self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), self.text)
+        state = self.stateStackedWidget.findChildren(QLabel)[self.state].text()
+        if self.state is self.OUTGOING:
+            return '%s\n%s\n' % (state, self.text)
+        else:
+            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.textEdit.toPlainText())
 
     @classmethod
     def writeData(cls, dataFile, textFile):
-        for widget in widgets(cls.parentLayout, 0, 1):
+        dataFile.write('# MorseControl data file')
+        textFile.write('# MorseControl text file')
+        for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
+            dataFile.write('\n')
             dataFile.write(widget.dataStr())
+            textFile.write('\n')
             textFile.write(widget.textStr())
 
     @classmethod
     def readData(cls, dataFile):
-        for widget in widgets(cls.parentLayout, 0, 1):
+        for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
             widget.setParent(None)
         MessageFrame()
         if dataFile:
