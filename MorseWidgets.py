@@ -62,6 +62,38 @@ class VerticalScrollArea(QScrollArea):
         self.setMinimumWidth(self.widget().sizeHint().width() + self.verticalScrollBar().width())
         QScrollArea.resizeEvent(self, event)
 
+class MorseLabel(QLabel):
+    def __init__(self, parent, text = ''):
+        super().__init__(text, parent)
+        self.setAlignment(Qt.AlignHCenter)
+
+class BitsLabel(MorseLabel):
+    BIT_CHARS = {'0': ' ', '1': '-'}
+    STYLE_SHEET = '''
+        background-color: white;
+        border-top: 1px solid;
+        border-bottom: 1px solid;
+        font-weight: bold;
+        font-family: Courier New, Courier, monospace
+    '''
+    def __init__(self, parent, bits = '', first = False, last = False):
+        super().__init__(parent, ''.join(self.BIT_CHARS[c] for c in bits))
+        self.setStyleSheet(self.STYLE_SHEET + ('; border-left: 1px solid' if first else '') + ('; border-right: 1px solid' if last else ''))
+        font = self.font()
+        font.setBold(True)
+        font.setStretch(30)
+        font.setLetterSpacing(font.PercentageSpacing, 50)
+        self.setFont(font)
+
+class CodeLabel(MorseLabel):
+    CODE_CHARS = {'.': '·', '-': '−'}
+    def __init__(self, parent, code = ''):
+        super().__init__(parent, ' '.join(self.CODE_CHARS.get(c, '') for c in code))
+        self.setStyleSheet('font-weight: bold')
+
+class CharLabel(MorseLabel):
+    pass
+
 class MessageFrame(QFrame):
     HEAD_SIZE = 0
     TAIL_SIZE = 1
@@ -124,13 +156,19 @@ class MessageFrame(QFrame):
     def setTime(self):
         self.timeLabel.setText(self.timeStamp.strftime(self.DISPLAY_TIME_FORMAT) if self.timeStamp else '')
 
+    def addToken(self, bits = '', code = '', char = '', first = False, last = False):
+        c = self.bitsGridLayout.columnCount()
+        self.bitsGridLayout.addWidget(BitsLabel(self, bits, first, last), 0, c)
+        self.bitsGridLayout.addWidget(CodeLabel(self, code), 1, c)
+        self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
+
     def setBits(self):
-        for widget in widgets(self.bitsGridLayout):
+        for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
-        for (i, (bits, code, char)) in enumerate(self.morse.parseBits(self.bits)):
-            self.bitsGridLayout.addWidget(QLabel(str(bits), self), 0, i)
-            self.bitsGridLayout.addWidget(QLabel(str(code), self), 1, i)
-            self.bitsGridLayout.addWidget(QLabel(char, self), 2, i)
+        self.addToken(first = True)
+        for (bits, code, char) in self.morse.parseBits(self.bits):
+            self.addToken(bits, code, char)
+        self.addToken(last = True)
 
     def dataStr(self):
         state = self.STATE_MARKS[self.state]

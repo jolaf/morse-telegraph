@@ -5,13 +5,94 @@
   <property name="windowTitle">
    <string>Автоматический телеграф Морзе</string>
   </property>
+  <property name="locale">
+   <locale language="Russian" country="Russia"/>
+  </property>
   <widget class="QWidget" name="mainWidget">
-   <layout class="QGridLayout" name="mainLayout" rowstretch="1,0" columnstretch="0,0">
-    <item row="1" column="1">
-     <widget class="ConsoleEdit" name="consoleEdit">
-      <property name="placeholderText">
-       <string>Вводите управляющие команды здесь</string>
+   <layout class="QGridLayout" name="mainLayout" rowstretch="1,0">
+    <item row="0" column="0">
+     <widget class="VerticalScrollArea" name="messageHistoryScrollArea">
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
       </property>
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="messageHistoryWidget">
+       <layout class="QVBoxLayout" name="messageHistoryLayout">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <spacer name="messageHistorySpacer">
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>0</width>
+            <height>0</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QWidget" name="consoleWidget" native="true">
+      <layout class="QVBoxLayout" name="consoleLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QPlainTextEdit" name="logTextEdit">
+         <property name="minimumSize">
+          <size>
+           <width>150</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <family>Courier New, Courier, monospace</family>
+           <pointsize>7</pointsize>
+          </font>
+         </property>
+         <property name="toolTip">
+          <string>Управляющая консоль:&lt;br&gt;префикс &amp;lt; в строке обозначает поступление данных с аппарата,&lt;br&gt;префикс &amp;gt; обозначает вывод данных на аппарат,&lt;br&gt;остальные строки – статусные и диагностические сообщения программы.</string>
+         </property>
+         <property name="statusTip">
+          <string>Управляющая консоль</string>
+         </property>
+         <property name="lineWrapMode">
+          <enum>QPlainTextEdit::NoWrap</enum>
+         </property>
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </item>
     <item row="1" column="0">
@@ -79,95 +160,11 @@
       </item>
      </layout>
     </item>
-    <item row="0" column="1">
-     <widget class="QWidget" name="consoleWidget" native="true">
-      <layout class="QVBoxLayout" name="consoleLayout">
-       <property name="leftMargin">
-        <number>0</number>
-       </property>
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <property name="rightMargin">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="QPlainTextEdit" name="logTextEdit">
-         <property name="minimumSize">
-          <size>
-           <width>150</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="font">
-          <font>
-           <family>Courier New, Courier, monospace</family>
-           <pointsize>7</pointsize>
-          </font>
-         </property>
-         <property name="toolTip">
-          <string>Управляющая консоль:&lt;br&gt;префикс &amp;lt; в строке обозначает поступление данных с аппарата,&lt;br&gt;префикс &amp;gt; обозначает вывод данных на аппарат,&lt;br&gt;остальные строки – статусные и диагностические сообщения программы.</string>
-         </property>
-         <property name="statusTip">
-          <string>Управляющая консоль</string>
-         </property>
-         <property name="lineWrapMode">
-          <enum>QPlainTextEdit::NoWrap</enum>
-         </property>
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="0" column="0">
-     <widget class="VerticalScrollArea" name="messageHistoryScrollArea">
-      <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+    <item row="1" column="1">
+     <widget class="ConsoleEdit" name="consoleEdit">
+      <property name="placeholderText">
+       <string>Вводите управляющие команды здесь</string>
       </property>
-      <property name="horizontalScrollBarPolicy">
-       <enum>Qt::ScrollBarAlwaysOff</enum>
-      </property>
-      <property name="widgetResizable">
-       <bool>true</bool>
-      </property>
-      <widget class="QWidget" name="messageHistoryWidget">
-       <layout class="QVBoxLayout" name="messageHistoryLayout">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
-        <item>
-         <spacer name="messageHistorySpacer">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>0</width>
-            <height>0</height>
-           </size>
-          </property>
-         </spacer>
-        </item>
-       </layout>
-      </widget>
      </widget>
     </item>
    </layout>

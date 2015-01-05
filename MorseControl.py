@@ -22,11 +22,14 @@ from UARTTextCommands import ackResponse, morseBeep
 from SerialPort import SerialPort, DT, TIMEOUT
 from MorseWidgets import MessageFrame
 
+#
 # ToDo
 # Load B25 or other similar font for messages: http://qt-project.org/forums/viewthread/12741
 # Change main container to Split instead of Grid
 # Fix segmentation faults - do not hold references to Qt objects
 # Make text edit to fit content properly
+# In MorseMessage, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
+#
 
 LONG_DATETIME_FORMAT = 'yyyy.MM.dd hh:mm:ss'
 

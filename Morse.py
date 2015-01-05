@@ -4,11 +4,10 @@ from itertools import chain
 from re import compile as reCompile
 from unittest import main, TestCase
 
-DOT = b'.'
-DASH = b'-'
-DOT_DASH = set(DOT + DASH)
+DOT = '.'
+DASH = '-'
+DOT_DASH = frozenset((DOT, DASH))
 COMMA = ','
-bCOMMA = b','
 START = '<<'
 END = '>>'
 ERROR = 'ERROR'
@@ -16,84 +15,83 @@ ERROR = 'ERROR'
 EXCEPTION = 'EXCEPTION'
 
 SPACE = ' '
-bSPACE = b' '
-WORD_SPACE = 3 * bSPACE
+WORD_SPACE = 3 * SPACE
 
-DIT = b'1'
-DAH = b'111'
-PAUSE = b'0'
-DIT_PAUSE = set(DIT + PAUSE)
-TOKENIZER = reCompile(b'(' + DIT + b'+)')
+DIT = '1'
+DAH = '111'
+PAUSE = '0'
+DIT_PAUSE = frozenset((DIT, PAUSE))
+TOKENIZER = reCompile('(%s+)' % DIT)
 
 BITS_PER_DIT = 3
 
 CODE_TO_BITS = {
     DOT: DIT,
     DASH: DAH,
-    bSPACE: PAUSE
+    SPACE: PAUSE
 }
 
 RUSSIAN_CODES = {
-    'A': b'.-',
-    'Б': b'-...',
-    'В': b'.--',
-    'Г': b'--.',
-    'Д': b'-..',
-    'Е,Ё,Ѣ': b'.',
-    'Ж': b'...-',
-    'З': b'--..',
-    'И,I,Ѵ': b'..',
-    'Й': b'.---',
-    'К': b'-.-',
-    'Л': b'.-..',
-    'М': b'--',
-    'Н': b'-.',
-    'О': b'---',
-    'П': b'.--.',
-    'Р': b'.-.',
-    'С': b'...',
-    'Т': b'-',
-    'У': b'..-',
-    'Ф,Ѳ': b'..-.',
-    'Х,*': b'....',
-    'Ц': b'-.-.',
-    'Ч': b'---.',
-    'Ш': b'----',
-    'Щ': b'--.-',
-    'Ь,Ъ': b'-..-,--.--,.--.-.',
-    'Ы': b'-.--',
-    'Э': b'..-..',
-    'Ю': b'..--',
-    'Я': b'.-.-',
-    '0': b'-----',
-    '1': b'.----',
-    '2': b'..---',
-    '3': b'...--',
-    '4': b'....-',
-    '5': b'.....',
-    '6': b'-....',
-    '7': b'--...',
-    '8': b'---..',
-    '9': b'----.',
-    '.': b'......',
-    ',': b'.-.-.-',
-    ';': b'-.-.-.',
-    ':': b'---...',
-    '?': b'..--..',
-    '!': b'--..--',
-    "'": b'.----.',
-    '"': b'.-..-.',
-    '(,)': b'-.--.-,-.--.',
-    '-': b'-....-',
-    '+': b'.-.-.',
-    '/,\\': b'-..-.',
-    '=': b'-...-',
-    START: b'-.-.-',
-    END:   b'..-.-,...-.-',
+    'А': '.-',
+    'Б': '-...',
+    'В': '.--',
+    'Г': '--.',
+    'Д': '-..',
+    'Е,Ё,Ѣ': '.',
+    'Ж': '...-',
+    'З': '--..',
+    'И,I,Ѵ': '..',
+    'Й': '.---',
+    'К': '-.-',
+    'Л': '.-..',
+    'М': '--',
+    'Н': '-.',
+    'О': '---',
+    'П': '.--.',
+    'Р': '.-.',
+    'С': '...',
+    'Т': '-',
+    'У': '..-',
+    'Ф,Ѳ': '..-.',
+    'Х,*': '....',
+    'Ц': '-.-.',
+    'Ч': '---.',
+    'Ш': '----',
+    'Щ': '--.-',
+    'Ь,Ъ': '-..-,--.--,.--.-.',
+    'Ы': '-.--',
+    'Э': '..-..',
+    'Ю': '..--',
+    'Я': '.-.-',
+    '0': '-----',
+    '1': '.----',
+    '2': '..---',
+    '3': '...--',
+    '4': '....-',
+    '5': '.....',
+    '6': '-....',
+    '7': '--...',
+    '8': '---..',
+    '9': '----.',
+    '.': '......',
+    ',': '.-.-.-',
+    ';': '-.-.-.',
+    ':': '---...',
+    '?': '..--..',
+    '!': '--..--',
+    "'": '.----.',
+    '"': '.-..-.',
+    '(,)': '-.--.-,-.--.',
+    '-': '-....-',
+    '+': '.-.-.',
+    '/,\\': '-..-.',
+    '=': '-...-',
+    START: '-.-.-',
+    END: '..-.-,...-.-'
 }
 
 class Morse(object):
-    def __init__(self, codes = RUSSIAN_CODES, errorCode = b'.', defaultChar = '', defaultCode = b''): # pylint: disable=W0102
+    def __init__(self, codes = RUSSIAN_CODES, errorCode = '.', defaultChar = '', defaultCode = ''): # pylint: disable=W0102
         assert codes, "Empty code table"
         self.encoding = {}
         self.decoding = {}
@@ -102,8 +100,8 @@ class Morse(object):
             assert ' ' not in chars, "Space in chars: %r" % chars
             chars = (COMMA,) if chars == COMMA else chars.split(COMMA)
             assert codes, "Empty codes for chars: %r " % chars
-            assert bSPACE not in codes, "Space in codes for chars %r: %r" % (chars, codes)
-            codes = codes.split(bCOMMA)
+            assert SPACE not in codes, "Space in codes for chars %r: %r" % (chars, codes)
+            codes = codes.split(COMMA)
             for char in chars:
                 assert char not in self.encoding, "Duplicate character: %r" % char
                 self.encoding[char] = codes[0]
@@ -121,7 +119,7 @@ class Morse(object):
     @staticmethod
     def _validateCode(code):
         assert code, "Empty code"
-        assert bSPACE not in code, "Space in code: %r" % code
+        assert SPACE not in code, "Space in code: %r" % code
         assert set(code) <= DOT_DASH, "Bad code: %r" % code
         return code
 
@@ -130,7 +128,7 @@ class Morse(object):
         return defaultChar
 
     def _validateDefaultCode(self, defaultCode):
-        assert defaultCode == b'' or defaultCode in self.decoding, "Unknown default code: %r" % defaultCode
+        assert defaultCode == '' or defaultCode in self.decoding, "Unknown default code: %r" % defaultCode
         return defaultCode
 
     def isError(self, code):
@@ -156,12 +154,15 @@ class Morse(object):
 
     def encodeWord(self, word, defaultCode = None):
         assert ' ' not in word, "Encoding spaces in word is not allowed: %r" % word
-        return bSPACE.join(self.encodeSymbol(char, defaultCode) for char in word)
+        ret = self.encodeSymbol(word, '')
+        if ret:
+            return ret
+        return SPACE.join(self.encodeSymbol(char, defaultCode) for char in word)
 
     def decodeWord(self, codeWord, defaultChar = None):
         ret = []
         exception = None
-        for code in codeWord.strip().split(bSPACE) if type(codeWord) is bytes else codeWord:
+        for code in codeWord.strip().split(SPACE) if type(codeWord) is bytes else codeWord:
             try:
                 char = self.decodeSymbol(code, defaultChar)
             except KeyError as e:
@@ -181,7 +182,7 @@ class Morse(object):
         return ''.join(ret)
 
     def encodePhrase(self, phrase, defaultCode = None):
-        return WORD_SPACE.join(self.encodeWord(word, defaultCode) for word in phrase.strip().split())
+        return WORD_SPACE.join(self.encodeWord(word, defaultCode) for word in chain.from_iterable(p.strip().split() for p in ((phrase,) if isinstance(phrase, str) else phrase))) # pylint: disable=C0325
 
     def decodePhrase(self, codePhrase, defaultChar = None):
         ret = []
@@ -192,72 +193,56 @@ class Morse(object):
         return ' '.join(ret)
 
     def encodeMessage(self, message, defaultCode = None):
-        return self.encodePhrase(' '.join((START, message, END)), defaultCode)
+        return self.encodePhrase((START, message, END), defaultCode)
 
     def decodeMessage(self, codePhrase, defaultChar = None):
         return self.decodePhrase(codePhrase, defaultChar)
 
     def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT):
-        print(repr(codePhrase))
-        return DIT * (2 * self.maxCodeLength) + PAUSE.join(CODE_TO_BITS[bytes((c,))] * bitsPerDit for c in codePhrase)
+        return ''.join(c * bitsPerDit for c in chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)))
 
-    @staticmethod
-    def bitsToCode(bits):
+    def parseBits(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
         def nMax(tokens, typ, number):
             counter = Counter(len(t) for t in tokens if t and t[0] == typ)
             lengths = tuple(k for (k, v) in sorted(counter.items(), key = lambda k_v: -k_v[1])[:number])
             return sorted(lengths) + [0,] * (number - len(lengths))
-        assert set(bits) == DIT_PAUSE
-        tokens = TOKENIZER.split(bits)
-        if not tokens:
-            return b''
-        (zero1, zero3, zero7) = nMax(tokens, PAUSE, 3)
-        zero3 = zero3 or 3 * zero1
-        zero7 = zero7 or zero3 * 7 // 3
-        (one1, one3) = nMax(tokens, DIT, 2)
-        one3 = one3 or one1 * 3
-        maxDit = (one1 + zero1 + one3 + zero3) // 4
-        maxDash = (one3 + zero3 + 2 * zero7) // 4
-        ret = []
-        for token in tokens:
-            length = len(token)
-            if token[0] == DIT:
-                ret.append(DOT if length <= maxDit else DASH)
-            elif length > maxDit:
-                ret.append(bSPACE if len(token) <= maxDash else WORD_SPACE)
-        return b''.join(ret)
-
-    def parseBits(self, bits):
-        def nMax(tokens, typ, number):
-            counter = Counter(len(t) for t in tokens if t and t[0] == typ)
-            lengths = tuple(k for (k, v) in sorted(counter.items(), key = lambda k_v: -k_v[1])[:number])
-            return sorted(lengths) + [0,] * (number - len(lengths))
-        assert set(bits) <= DIT_PAUSE
-        tokens = TOKENIZER.split(bits)
+        tokens = TOKENIZER.split(''.join(convertOnesTo if b in ones else convertZerosTo if b in zeros else None for b in bits).strip(convertZerosTo))
+        if tokens and not tokens[0]:
+            tokens = tokens[1:]
+        if tokens and not tokens[-1]:
+            tokens = tokens[:-1]
         if not tokens:
             return ()
-        (zero1, zero3, zero7) = nMax(tokens, PAUSE, 3)
+        (zero1, zero3, zero7) = nMax(tokens, convertZerosTo, 3)
         zero3 = zero3 or 3 * zero1
         zero7 = zero7 or zero3 * 7 // 3
-        (one1, one3) = nMax(tokens, DIT, 2)
+        (one1, one3) = nMax(tokens, convertOnesTo, 2)
         one3 = one3 or one1 * 3
         maxDit = (one1 + zero1 + one3 + zero3) // 4
         maxDash = (one3 + zero3 + 2 * zero7) // 4
         ret = []
         groupBits = []
         groupCode = []
-        for token in chain(tokens, (b'',)):
+        groupOK = True
+        for token in chain(tokens, ('',)):
             length = len(token)
-            if token and token[0] == DIT:
+            if token and token[0] == convertOnesTo:
                 groupBits.append(token)
-                groupCode.append(DOT if length <= maxDit else DASH)
+                if groupOK and length <= maxDash:
+                    groupCode.append(DOT if length <= maxDit else DASH)
+                else:
+                    groupOK = False
             elif length and length <= maxDit:
                 groupBits.append(token)
             else:
-                code = b''.join(groupCode)
-                ret.append((b''.join(groupBits), code, self.decodeSymbol(code) if code else ''))
+                if groupBits:
+                    code = ''.join(groupCode)
+                    ret.append((''.join(groupBits), code, self.decodeSymbol(code) if groupOK else ''))
+                    groupBits = []
+                    groupCode = []
+                    groupOK = True
                 if length: # not the last token
-                    ret.append((token, bSPACE if len(token) <= maxDash else WORD_SPACE, ''))
+                    ret.append((token, SPACE if len(token) <= maxDash else WORD_SPACE, ''))
         return tuple(ret)
 
     def messageToBits(self, message):
@@ -269,11 +254,11 @@ class MorseTest(TestCase):
 
     def testEncode(self):
         chars = ['1', 'Д', '9', '?', 'Ч', 'Б', 'Ш', '.', 'Г', '4', 'Ь', 'Ъ', 'Й', 'О', ';', 'К', 'Ы', 'С', ':', 'A', 'М', '5', '(', ')', 'Ф', 'Ѳ', 'Л', '+', '3', 'И', 'I', 'Ѵ', 'END', 'У', 'START', '-', '8', '!', 'Э', '7', '2', 'Е', 'Ё', 'Ѣ', 'Ж', 'Ю', 'Ц', "'", 'Н', '=', 'Щ', 'Х', '*', '6', 'П', '0', 'В', '/', '\\', 'Р', 'Я', 'Т', '"', 'З']
-        codes = b'.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- -..- .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--.- ..-. ..-. .-.. .-.-. ...-- .. .. .. ..-.- ..- -.-.- -....- ---.. --..-- ..-.. --... ..--- . . . ...- ..-- -.-. .----. -. -...- --.- .... .... -.... .--. ----- .-- -..-. -..-. .-. .-.- - .-..-. --..'
+        codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- -..- .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--.- ..-. ..-. .-.. .-.-. ...-- .. .. .. ..-.- ..- -.-.- -....- ---.. --..-- ..-.. --... ..--- . . . ...- ..-- -.-. .----. -. -...- --.- .... .... -.... .--. ----- .-- -..-. -..-. .-. .-.- - .-..-. --..'
         self.assertEqual(self.morse.encodeWord(chars), codes)
 
     def testDecode(self):
-        codes = b'.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- --.-- .--.-. .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--. ..-. .-.. .-.-. ...-- .. ..-.- ...-.- ..- -.-.- -....- ---.. --..-- ..-.. --... .-.-.- ..--- . ...- ..-- -.-. .----. -. -...- --.- .... -.... .--. ----- .-- -..-. .-. .-.- - .-..-. --..'
+        codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- --.-- .--.-. .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--. ..-. .-.. .-.-. ...-- .. ..-.- ...-.- ..- -.-.- -....- ---.. --..-- ..-.. --... .-.-.- ..--- . ...- ..-- -.-. .----. -. -...- --.- .... -.... .--. ----- .-- -..-. .-. .-.- - .-..-. --..'
         chars = '1Д9?ЧБШ.Г4ЬЬЬЙО;КЫС:AМ5((ФЛ+3ИENDENDУSTART-8!Э7,2ЕЖЮЦ\'Н=ЩХ6П0В/РЯТ"З'
         self.assertEqual(self.morse.decodeWord(codes), chars)
 
