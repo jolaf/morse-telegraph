@@ -13,9 +13,6 @@
     <layout class="QHBoxLayout" name="headerLayout" stretch="0,0,1,0">
      <item>
       <widget class="QStackedWidget" name="stateStackedWidget">
-       <property name="currentIndex">
-        <number>0</number>
-       </property>
        <widget class="QWidget" name="outgoingPage">
         <layout class="QHBoxLayout" name="outgoingLayout">
          <property name="leftMargin">
@@ -40,6 +37,12 @@
            </property>
            <property name="text">
             <string>Исходящая</string>
+           </property>
+           <property name="indent">
+            <number>5</number>
+           </property>
+           <property name="textInteractionFlags">
+            <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
            </property>
           </widget>
          </item>
@@ -70,6 +73,9 @@
            <property name="text">
             <string>Отправленная</string>
            </property>
+           <property name="indent">
+            <number>5</number>
+           </property>
           </widget>
          </item>
         </layout>
@@ -98,6 +104,12 @@
            </property>
            <property name="text">
             <string>Полученная</string>
+           </property>
+           <property name="indent">
+            <number>5</number>
+           </property>
+           <property name="textInteractionFlags">
+            <set>Qt::LinksAccessibleByMouse|Qt::TextEditable</set>
            </property>
           </widget>
          </item>
@@ -241,9 +253,30 @@
     </layout>
    </item>
    <item>
-    <widget class="QPlainTextEdit" name="textEdit">
-     <property name="sizeAdjustPolicy">
-      <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
+    <widget class="MessageTextLabel" name="textEditLabel">
+     <property name="styleSheet">
+      <string notr="true">background: white</string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Sunken</enum>
+     </property>
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+     <property name="textFormat">
+      <enum>Qt::PlainText</enum>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+     <property name="textInteractionFlags">
+      <set>Qt::TextEditorInteraction</set>
      </property>
     </widget>
    </item>
@@ -284,6 +317,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>MessageTextLabel</class>
+   <extends>QLabel</extends>
+   <header>MorseWidgets</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

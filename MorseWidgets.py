@@ -3,6 +3,7 @@
 # Morse Control widget definitions
 #
 from datetime import datetime
+from re import compile as reCompile
 
 try:
     from PyQt5 import uic
@@ -94,6 +95,19 @@ class CodeLabel(MorseLabel):
 class CharLabel(MorseLabel):
     pass
 
+class MessageTextLabel(QLabel):
+    def keyPressEvent(self, event):
+        QLabel.keyPressEvent(self, event)
+        self.updateMessage()
+
+    def mousePressEvent(self, event):
+        QLabel.mousePressEvent(self, event)
+        if event.button() == Qt.MiddleButton:
+            self.updateMessage()
+
+    def updateMessage(self):
+        self.updateGeometry()
+
 class MessageFrame(QFrame):
     HEAD_SIZE = 0
     TAIL_SIZE = 1
@@ -104,6 +118,7 @@ class MessageFrame(QFrame):
     RECEIVED = 2
     STATE_MARKS = '!><'
     STATES = []
+    SPLITTER = reCompile(r'\s*\n\s*')
 
     @classmethod
     def configure(cls, uiFile, parentWidget):
@@ -128,8 +143,8 @@ class MessageFrame(QFrame):
             if self.state == self.OUTGOING:
                 assert len(tokens) == 1
                 self.timeStamp = None
-                text = next(reader)
-                self.bits = self.morse.messageToBits(text)
+                text = next(reader).replace('\\n', '\n')
+                self.bits = self.morse.messageToBits(self.SPLITTER.sub(' = ', text))
             else:
                 assert len(tokens) == 2
                 self.timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
@@ -143,15 +158,17 @@ class MessageFrame(QFrame):
         uic.loadUi(self.uiFile, self)
         if not self.STATES:
             self.STATES.extend(label.text() for label in (self.outgoingLabel, self.sentLabel, self.receivedLabel))
-        # self.textEdit.setPlaceholderText("Вводите текст сообщения для отправки здесь") # ToDo: Add in Designer after moving to Qt 5.3+
+        # self.textEdit.setPlaceholderText("Вводите текст сообщения для отправки здесь") # ToDo: Add in Designer after moving to QPlainTextEdit and Qt 5.3+
         self.stateStackedWidget.setCurrentIndex(self.state)
         self.controlStackedWidget.setCurrentIndex(self.state)
         self.setTime()
+        self.textEditLabel.setText(text)
         self.setBits()
-        self.textEdit.setPlainText(text)
         self.parentLayout.insertWidget(self.parentLayout.count() - self.TAIL_SIZE, self)
+        self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE - 1, 0)
+        self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
         if not stream:
-            self.textEdit.setFocus()
+            self.textEditLabel.setFocus()
 
     def setTime(self):
         self.timeLabel.setText(self.timeStamp.strftime(self.DISPLAY_TIME_FORMAT) if self.timeStamp else '')
@@ -173,16 +190,16 @@ class MessageFrame(QFrame):
     def dataStr(self):
         state = self.STATE_MARKS[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.textEdit.toPlainText())
+            return '%s\n%s\n' % (state, '\\n'.join(self.textEditLabel.text().splitlines()))
         else:
-            return '%s\n%s\n%s\n' % (b' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), self.textEdit.toPlainText(), self.bits)
+            return '%s\n%s\n%s\n' % (b' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(self.textEditLabel.text().splitlines()), self.bits)
 
     def textStr(self):
         state = self.STATES[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.textEdit.toPlainText())
+            return '%s\n%s\n' % (state, self.textEditLabel.text())
         else:
-            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.textEdit.toPlainText())
+            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.textEditLabel.text())
 
     @classmethod
     def writeData(cls, dataFile, textFile):

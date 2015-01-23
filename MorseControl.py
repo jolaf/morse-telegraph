@@ -24,10 +24,8 @@ from MorseWidgets import MessageFrame
 
 #
 # ToDo
-# Load B25 or other similar font for messages: http://qt-project.org/forums/viewthread/12741
-# Change main container to Split instead of Grid
 # Fix segmentation faults - do not hold references to Qt objects
-# Make text edit to fit content properly
+# Try to use QPlainTextEdit for message text instead of QLabel
 # In MorseMessage, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
 #
 
@@ -81,6 +79,7 @@ class EmulatedSerial(object):
             sleep(DT)
 
     def write(self, data):
+        ret = ''
         try:
             (tag, args) = Command.decodeCommand(data)
             if True:
@@ -146,8 +145,9 @@ class MorseControl(QMainWindow):
         height = resolution.height()
         self.setGeometry(width * WINDOW_POSITION, height * WINDOW_POSITION, width * WINDOW_SIZE, height * WINDOW_SIZE)
         # Configuring widgets
+        self.setCentralWidget(self.splitter)
         self.portLabel.configure()
-        self.consoleControlButton.configure(self.advanced, self.logTextEdit, self.consoleEdit)
+        self.consoleControlButton.configure(self.advanced, self.rightWidget)
         self.resetButton.clicked.connect(self.reset)
         self.consoleEdit.configure(self.consoleEnter)
         self.aboutDialog = AboutDialog()
@@ -259,7 +259,8 @@ class MorseControl(QMainWindow):
             settings.setValue('x', max(0, self.pos().x()))
             settings.setValue('y', max(0, self.pos().y()))
             settings.setValue('maximized', self.isMaximized())
-            settings.setValue('state', self.saveState())
+            settings.setValue('windowState', self.saveState())
+            settings.setValue('splitterState', self.splitter.saveState())
             settings.endGroup()
         except:
             self.logger.exception("Error saving settings")
@@ -284,7 +285,8 @@ class MorseControl(QMainWindow):
                     self.resize(settings.value('width', type = int), settings.value('height', type = int))
                     self.move(settings.value('x', type = int), settings.value('y', type = int))
                     self.savedMaximized = settings.value('maximized', False, type = bool)
-                    self.restoreState(settings.value('state', type = QByteArray))
+                    self.restoreState(settings.value('windowState', type = QByteArray))
+                    self.splitter.restoreState(settings.value('splitterState', type = QByteArray))
                     settings.endGroup()
                     self.logger.info("Loaded settings dated %s", timeStamp)
                     return

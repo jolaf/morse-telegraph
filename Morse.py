@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from collections import Counter
 from itertools import chain
 from re import compile as reCompile
 from unittest import main, TestCase
@@ -8,9 +7,9 @@ DOT = '.'
 DASH = '-'
 DOT_DASH = frozenset((DOT, DASH))
 COMMA = ','
-START = '<<'
-END = '>>'
-ERROR = 'ERROR'
+START = 'НЧЛ'
+END = 'КНЦ'
+ERROR = 'ОШК'
 
 EXCEPTION = 'EXCEPTION'
 
@@ -21,7 +20,7 @@ DIT = '1'
 DAH = '111'
 PAUSE = '0'
 DIT_PAUSE = frozenset((DIT, PAUSE))
-TOKENIZER = reCompile('(%s+)' % DIT)
+TOKENIZER = reCompile('(%s+)' % PAUSE)
 
 BITS_PER_DIT = 3
 
@@ -162,7 +161,7 @@ class Morse(object):
     def decodeWord(self, codeWord, defaultChar = None):
         ret = []
         exception = None
-        for code in codeWord.strip().split(SPACE) if type(codeWord) is bytes else codeWord:
+        for code in codeWord.strip().split(SPACE) if isinstance(codeWord, str) else codeWord:
             try:
                 char = self.decodeSymbol(code, defaultChar)
             except KeyError as e:
@@ -202,24 +201,44 @@ class Morse(object):
         return ''.join(c * bitsPerDit for c in chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)))
 
     def parseBits(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
-        def nMax(tokens, typ, number):
-            counter = Counter(len(t) for t in tokens if t and t[0] == typ)
-            lengths = tuple(k for (k, v) in sorted(counter.items(), key = lambda k_v: -k_v[1])[:number])
-            return sorted(lengths) + [0,] * (number - len(lengths))
+        class Cluster(object):
+            def __init__(self, center, weight, mn, mx):
+                self.center = center
+                self.weight = weight
+                self.mn = mn
+                self.mx = mx
+            def __str__(self):
+                return '%s(%s, %s, %s, %s)' % (self.__class__.__name__, self.center, self.weight, self.mn, self.mx)
         tokens = TOKENIZER.split(''.join(convertOnesTo if b in ones else convertZerosTo if b in zeros else None for b in bits).strip(convertZerosTo))
-        if tokens and not tokens[0]:
-            tokens = tokens[1:]
-        if tokens and not tokens[-1]:
-            tokens = tokens[:-1]
-        if not tokens:
-            return ()
-        (zero1, zero3, zero7) = nMax(tokens, convertZerosTo, 3)
-        zero3 = zero3 or 3 * zero1
-        zero7 = zero7 or zero3 * 7 // 3
-        (one1, one3) = nMax(tokens, convertOnesTo, 2)
-        one3 = one3 or one1 * 3
-        maxDit = (one1 + zero1 + one3 + zero3) // 4
-        maxDash = (one3 + zero3 + 2 * zero7) // 4
+        lengths = sorted(len(token) for token in tokens[1:])
+        if not lengths:
+            lengths = [len(tokens[0])]
+        (minLen, maxLen) = (lengths[0], lengths[-1])
+        lenRange = float(maxLen - minLen)
+        # Employ 3-means clustering
+        clusters = tuple(Cluster(minLen + lenRange * x / 8, 0, maxLen, minLen) for x in (1, 3, 7))
+        for sample in lengths:
+            # Find the closest cluster for this sample
+            cluster = min(clusters, key = lambda cluster: abs(sample - cluster.center))# pylint: disable=W0640
+            # Adjust cluster: each sample has weight of 1, cluster center is adjusted, its weight increases
+            cluster.center = (cluster.center * cluster.weight + sample) / (cluster.weight + 1)
+            cluster.weight += 1
+            if sample < cluster.mn:
+                cluster.mn = sample
+            if sample > cluster.mx:
+                cluster.mx = sample
+        # Fill the gaps if we really have less than 3 clusters
+        clusters = [cluster for cluster in clusters if cluster.weight] # Filter out empty clusters
+        if len(clusters) == 2:
+            if float(clusters[1].mn) / clusters[0].mx >= 5: # If 1 and 7 are present while 3 is not, add a syntetic cluster for 3
+                clusters.insert(1, Cluster((clusters[0].mx + clusters[1].mn) / 2.0, 0, clusters[0].mx + 1, clusters[1].mn - 1))
+        if len(clusters) < 3: # If only 1 is present (or only 1 and 3 are), add syntetic clusters for 3 and 7 (or just 7)
+            limit = clusters[-1].mx + 1
+            clusters.extend(Cluster(limit, 0, limit, limit) for i in range(3 - len(clusters)))
+        # Calculating edges between dots and dashes, and dashes and word pauses
+        maxDit = (clusters[0].mx + clusters[1].mn) / 2.0
+        maxDah = (clusters[1].mx + clusters[2].mn) / 2.0
+        # Perform transcoding
         ret = []
         groupBits = []
         groupCode = []
@@ -228,7 +247,7 @@ class Morse(object):
             length = len(token)
             if token and token[0] == convertOnesTo:
                 groupBits.append(token)
-                if groupOK and length <= maxDash:
+                if groupOK and length <= maxDah:
                     groupCode.append(DOT if length <= maxDit else DASH)
                 else:
                     groupOK = False
@@ -242,7 +261,7 @@ class Morse(object):
                     groupCode = []
                     groupOK = True
                 if length: # not the last token
-                    ret.append((token, SPACE if len(token) <= maxDash else WORD_SPACE, ''))
+                    ret.append((token, SPACE if length <= maxDah else WORD_SPACE, ''))
         return tuple(ret)
 
     def messageToBits(self, message):
