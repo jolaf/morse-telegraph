@@ -9,134 +9,23 @@
    <locale language="Russian" country="Russia"/>
   </property>
   <widget class="QSplitter" name="splitter">
-   <widget class="QWidget" name="leftWidget">
-    <layout class="QVBoxLayout" name="leftLayout" stretch="1,0">
-     <property name="spacing">
-      <number>9</number>
-     </property>
-     <property name="leftMargin">
-      <number>9</number>
-     </property>
-     <property name="topMargin">
-      <number>9</number>
-     </property>
-     <property name="rightMargin">
-      <number>9</number>
-     </property>
-     <property name="bottomMargin">
-      <number>9</number>
-     </property>
-     <item>
-      <widget class="VerticalScrollArea" name="messageHistoryScrollArea">
-       <property name="frameShape">
-        <enum>QFrame::NoFrame</enum>
-       </property>
-       <property name="horizontalScrollBarPolicy">
-        <enum>Qt::ScrollBarAlwaysOff</enum>
-       </property>
-       <property name="widgetResizable">
-        <bool>true</bool>
-       </property>
-       <widget class="QWidget" name="messageHistoryWidget">
-        <layout class="QVBoxLayout" name="messageHistoryLayout">
-         <property name="spacing">
-          <number>9</number>
-         </property>
-         <property name="leftMargin">
-          <number>0</number>
-         </property>
-         <property name="topMargin">
-          <number>0</number>
-         </property>
-         <property name="rightMargin">
-          <number>0</number>
-         </property>
-         <property name="bottomMargin">
-          <number>0</number>
-         </property>
-         <item>
-          <spacer name="messageHistorySpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>0</width>
-             <height>0</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-      </widget>
-     </item>
-     <item>
-      <layout class="QHBoxLayout" name="controlLayout" stretch="0,0,1,0">
-       <item>
-        <widget class="PortLabel" name="portLabel">
-         <property name="minimumSize">
-          <size>
-           <width>65</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="statusTip">
-          <string>Порт подключения телеграфного аппарата</string>
-         </property>
-         <property name="styleSheet">
-          <string notr="true">background: rgb(192,192,192)</string>
-         </property>
-         <property name="text">
-          <string>НЕТ АПП</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="resetButton">
-         <property name="statusTip">
-          <string>Сброс соединения</string>
-         </property>
-         <property name="text">
-          <string>Сброс</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="controlSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>0</width>
-           <height>0</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="ConsoleControlButton" name="consoleControlButton">
-         <property name="statusTip">
-          <string>Закрыть консоль управления</string>
-         </property>
-         <property name="text">
-          <string>&gt;</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
+   <widget class="VerticalScrollArea" name="messageHistoryScrollArea">
+    <property name="frameShape">
+     <enum>QFrame::NoFrame</enum>
+    </property>
+    <property name="horizontalScrollBarPolicy">
+     <enum>Qt::ScrollBarAlwaysOff</enum>
+    </property>
+    <property name="widgetResizable">
+     <bool>true</bool>
+    </property>
+    <widget class="QWidget" name="messageHistoryWidget">
+     <layout class="QVBoxLayout" name="messageHistoryLayout">
+      <item>
+       <spacer name="messageHistorySpacer"/>
+      </item>
+     </layout>
+    </widget>
    </widget>
    <widget class="QWidget" name="rightWidget">
     <layout class="QVBoxLayout" name="rightLayout" stretch="1,0">
@@ -181,11 +70,56 @@
       </widget>
      </item>
      <item>
-      <widget class="ConsoleEdit" name="consoleEdit">
-       <property name="placeholderText">
-        <string>Вводите управляющие команды здесь</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="controlLayout" stretch="1,0,0">
+       <item>
+        <widget class="ConsoleEdit" name="consoleEdit">
+         <property name="statusTip">
+          <string>Вводите управляющие команды здесь</string>
+         </property>
+         <property name="placeholderText">
+          <string>Вводите управляющие команды здесь</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="resetButton">
+         <property name="statusTip">
+          <string>Переустановить соединение с аппаратом</string>
+         </property>
+         <property name="text">
+          <string>Сброс</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="PortLabel" name="portLabel">
+         <property name="minimumSize">
+          <size>
+           <width>65</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="statusTip">
+          <string>Порт подключения телеграфного аппарата</string>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background: rgb(192,192,192)</string>
+         </property>
+         <property name="text">
+          <string>НЕТ АПП</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
     </layout>
    </widget>
@@ -256,11 +190,6 @@
    <extends>QScrollArea</extends>
    <header>MorseWidgets</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>ConsoleControlButton</class>
-   <extends>QPushButton</extends>
-   <header>MorseWidgets</header>
   </customwidget>
  </customwidgets>
  <resources/>

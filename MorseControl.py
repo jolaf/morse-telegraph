@@ -5,6 +5,7 @@
 from collections import deque
 from functools import partial
 from getopt import getopt
+from locale import setlocale, LC_ALL
 from logging import getLogger, getLoggerClass, setLoggerClass, FileHandler, Formatter, Handler, INFO, NOTSET
 from sys import argv, exit # pylint: disable=W0622
 from time import sleep
@@ -146,8 +147,8 @@ class MorseControl(QMainWindow):
         self.setGeometry(width * WINDOW_POSITION, height * WINDOW_POSITION, width * WINDOW_SIZE, height * WINDOW_SIZE)
         # Configuring widgets
         self.setCentralWidget(self.splitter)
+        self.rightWidget.setVisible(self.advanced)
         self.portLabel.configure()
-        self.consoleControlButton.configure(self.advanced, self.rightWidget)
         self.resetButton.clicked.connect(self.reset)
         self.consoleEdit.configure(self.consoleEnter)
         self.aboutDialog = AboutDialog()
@@ -166,7 +167,7 @@ class MorseControl(QMainWindow):
         self.logger.configure(self) # pylint: disable=E1103
         self.logger.info("start")
         # Loading messages
-        MessageFrame.configure(MESSAGE_UI_FILE_NAME, self.messageHistoryWidget)
+        MessageFrame.configure(MESSAGE_UI_FILE_NAME, self.messageHistoryWidget, self.sendMessage)
         # Starting up!
         self.loadSettings()
         self.loadData()
@@ -221,6 +222,9 @@ class MorseControl(QMainWindow):
         data = self.consoleEdit.getInput()
         if data:
             self.port.write(data)
+
+    def sendMessage(self, message):
+        pass
 
     def closeEvent(self, event):
         if self.askForExit():
@@ -303,8 +307,11 @@ class MorseControl(QMainWindow):
 if __name__ == '__main__': # Not using main() function per recommendation for PyQt5:
     try:                   # http://pyqt.sourceforge.net/Docs/PyQt5/pyqt4_differences.html#object-destruction-on-exit
         application = QApplication(argv)
-        _MorseControl = MorseControl(argv[1:]) # retain reference
-        exit(application.exec_())
+        setlocale(LC_ALL, ('ru_RU', 'UTF-8')) # doesn't work on Ubuntu if performed earlier
+        morseControl = MorseControl(argv[1:]) # retain reference
+        retCode = application.exec_()
+        application.deleteLater()
+        exit(retCode)
     except KeyboardInterrupt:
         pass
     except SystemExit:

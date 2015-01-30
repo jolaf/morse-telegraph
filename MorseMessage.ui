@@ -13,6 +13,9 @@
     <layout class="QHBoxLayout" name="headerLayout" stretch="0,0,1,0">
      <item>
       <widget class="QStackedWidget" name="stateStackedWidget">
+       <property name="statusTip">
+        <string>Статус телеграммы</string>
+       </property>
        <widget class="QWidget" name="outgoingPage">
         <layout class="QHBoxLayout" name="outgoingLayout">
          <property name="leftMargin">
@@ -119,6 +122,9 @@
      </item>
      <item>
       <widget class="QLabel" name="timeLabel">
+       <property name="statusTip">
+        <string>Время отправки/приема телеграммы</string>
+       </property>
        <property name="text">
         <string>16 Dec 2014 15:23:14</string>
        </property>
@@ -148,15 +154,21 @@
          </property>
          <item>
           <widget class="QPushButton" name="resetOutgoingButton">
+           <property name="statusTip">
+            <string>Удалить текст</string>
+           </property>
            <property name="text">
-            <string>Reset</string>
+            <string>Сброс</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="sendOutgoingButton">
+           <property name="statusTip">
+            <string>Отправить телеграмму</string>
+           </property>
            <property name="text">
-            <string>Send</string>
+            <string>Отправить</string>
            </property>
           </widget>
          </item>
@@ -181,8 +193,11 @@
          </item>
          <item>
           <widget class="QPushButton" name="deleteSentButton">
+           <property name="statusTip">
+            <string>Удалить телеграмму (без возможности восстановления!)</string>
+           </property>
            <property name="text">
-            <string>Delete</string>
+            <string>Удалить</string>
            </property>
           </widget>
          </item>
@@ -204,15 +219,21 @@
          </property>
          <item>
           <widget class="QPushButton" name="editReceivedButton">
+           <property name="statusTip">
+            <string>Отредактировать текст полученной телеграммы</string>
+           </property>
            <property name="text">
-            <string>Edit</string>
+            <string>Править</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="deleteReceivedButton">
+           <property name="statusTip">
+            <string>Удалить телеграмму (без возможности восстановления!)</string>
+           </property>
            <property name="text">
-            <string>Delete</string>
+            <string>Удалить</string>
            </property>
           </widget>
          </item>
@@ -234,15 +255,21 @@
          </property>
          <item>
           <widget class="QPushButton" name="cancelReceivedButton">
+           <property name="statusTip">
+            <string>Отменить исправления и вернуться к исходному тексту</string>
+           </property>
            <property name="text">
-            <string>Cancel</string>
+            <string>Отменить</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="saveReceivedButton">
+           <property name="statusTip">
+            <string>Сохранить изменения</string>
+           </property>
            <property name="text">
-            <string>Save</string>
+            <string>Сохранить</string>
            </property>
           </widget>
          </item>
