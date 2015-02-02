@@ -8,7 +8,8 @@ from re import compile as reCompile
 try:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt
-    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPushButton, QScrollArea
+    from PyQt5.QtGui import QFontMetrics
+    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
@@ -95,22 +96,20 @@ class CodeLabel(MorseLabel):
 class CharLabel(MorseLabel):
     pass
 
-class MessageTextLabel(QLabel):
+class MessageTextEdit(QPlainTextEdit):
+    HEIGHT_ADJUSTMENT = 7 # Hate this hack!
+
     callback = None # Set by MessageFrame
 
-    def keyPressEvent(self, event):
-        QLabel.keyPressEvent(self, event)
-        self.updateMessage()
+    def __init__(self, parent):
+        QPlainTextEdit.__init__(self, parent)
+        self.document().contentsChanged.connect(self.updateSize)
 
-    def mousePressEvent(self, event):
-        QLabel.mousePressEvent(self, event)
-        if event.button() == Qt.MiddleButton:
-            self.updateMessage()
-
-    def updateMessage(self):
+    def updateSize(self):
+        self.setFixedHeight(self.document().size().height() * QFontMetrics(self.font()).height() \
+                + self.contentsMargins().top() + self.contentsMargins().bottom() + self.HEIGHT_ADJUSTMENT)
         if self.callback:
-            self.callback(self.text()) # pylint: disable=E1102
-        self.updateGeometry()
+            self.callback(self.toPlainText()) # pylint: disable=E1102
 
 class MessageFrame(QFrame):
     HEAD_SIZE = 0
@@ -164,26 +163,25 @@ class MessageFrame(QFrame):
         uic.loadUi(self.uiFile, self)
         if not self.stateTexts:
             self.stateTexts.extend(label.text() for label in (self.outgoingLabel, self.sentLabel, self.receivedLabel, self.receivedLabel))
-            self.textInteractionFlags = self.textEditLabel.textInteractionFlags()
-        # self.textEdit.setPlaceholderText("Вводите текст сообщения для отправки здесь") # ToDo: Add in Designer after moving to QPlainTextEdit and Qt 5.3+
+        # self.textEdit.setPlaceholderText("Вводите текст сообщения здесь") # ToDo: Add in Designer after moving to Qt 5.3+
         self.setTime()
-        self.textEditLabel.setText(text)
+        self.messageTextEdit.setPlainText(text)
         self.setBits()
         self.resetOutgoingButton.clicked.connect(self.resetOutgoing)
         self.sendOutgoingButton.clicked.connect(self.sendOutgoing)
-        self.textEditLabel.callback = self.textUpdatedCallback
+        self.messageTextEdit.callback = self.textUpdatedCallback
         self.setState(state)
         self.parentLayout.insertWidget(self.parentLayout.count() - self.TAIL_SIZE, self)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE - 1, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
         if not stream:
-            self.textEditLabel.setFocus()
+            self.messageTextEdit.setFocus()
 
     def setState(self, state):
         self.state = state
         self.stateStackedWidget.setCurrentIndex(state)
         self.controlStackedWidget.setCurrentIndex(state)
-        self.textEditLabel.updateMessage()
+        self.messageTextEdit.setReadOnly(state in (self.SENT, self.RECEIVED))
 
     def setTime(self):
         self.timeLabel.setText('в ' + self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT) if self.timeStamp else '')
@@ -208,16 +206,16 @@ class MessageFrame(QFrame):
     def dataStr(self):
         state = self.STATE_MARKS[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, '\\n'.join(self.textEditLabel.text().splitlines()))
+            return '%s\n%s\n' % (state, '\\n'.join(self.messageTextEdit.toPlainText().splitlines()))
         else:
-            return '%s\n%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(self.textEditLabel.text().splitlines()), self.bits)
+            return '%s\n%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(self.messageTextEdit.toPlainText().splitlines()), self.bits)
 
     def textStr(self):
         state = self.stateTexts[self.state]
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.textEditLabel.text())
+            return '%s\n%s\n' % (state, self.messageTextEdit.toPlainText())
         else:
-            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.textEditLabel.text())
+            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.messageTextEdit.toPlainText())
 
     @classmethod
     def writeData(cls, dataFile, textFile):
@@ -244,17 +242,16 @@ class MessageFrame(QFrame):
 
     def textUpdatedCallback(self, text):
         if self.state == self.OUTGOING:
-            text = self.textEditLabel.text()
+            text = self.messageTextEdit.toPlainText()
             self.sendOutgoingButton.setDisabled(not text)
             self.resetOutgoingButton.setDisabled(not text)
 
     def resetOutgoing(self):
-        self.textEditLabel.clear()
-        self.textEditLabel.setFocus()
+        self.messageTextEdit.clear()
+        self.messageTextEdit.setFocus()
 
     def sendOutgoing(self):
         self.sendCallback(self.bits)
-        self.textEditLabel.setTextInteractionFlags(self.textInteractionFlags ^ Qt.TextEditable)
         self.timeStamp = datetime.now()
         self.setState(self.SENT)
         self.setTime()
