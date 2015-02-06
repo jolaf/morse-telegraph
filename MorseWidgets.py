@@ -7,9 +7,9 @@ from re import compile as reCompile
 
 try:
     from PyQt5 import uic
-    from PyQt5.QtCore import Qt
+    from PyQt5.QtCore import Qt, QMimeData
     from PyQt5.QtGui import QFontMetrics
-    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPlainTextEdit, QPushButton, QScrollArea
+    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPlainTextEdit, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
@@ -25,21 +25,6 @@ def setTip(widget, tip):
 def widgets(layout, headerSize = 0, tailSize = 0): # generator
     for i in range(headerSize, layout.count() - tailSize):
         yield layout.itemAt(i).widget()
-
-class ConsoleControlButton(QPushButton):
-    def configure(self, consoleOpen = False, *args):
-        self.consoleOpen = not consoleOpen
-        self.args = args
-        fixWidgetSize(self, 3)
-        self.clicked.connect(self.processClick)
-        self.processClick()
-
-    def processClick(self, _checked = False):
-        self.consoleOpen = not self.consoleOpen
-        self.setText('>' if self.consoleOpen else '<')
-        setTip(self, ("Закрыть" if self.consoleOpen else "Открыть") + " консоль управления")
-        for arg in self.args:
-            arg.setVisible(self.consoleOpen)
 
 class ConsoleEdit(QLineEdit):
     def configure(self, callback):
@@ -97,17 +82,41 @@ class CharLabel(MorseLabel):
     pass
 
 class MessageTextEdit(QPlainTextEdit):
+    ALLOWED_CHARACTERS = ' \n\r\x08\x7f' # Space, Enter, Backspace, Del
+    ALLOWED_MODIFIERS = Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier | Qt.GroupSwitchModifier
     HEIGHT_ADJUSTMENT = 7 # Hate this hack!
 
     callback = None # Set by MessageFrame
+
+    @classmethod
+    def configure(cls, morse):
+        cls.morse = morse
 
     def __init__(self, parent):
         QPlainTextEdit.__init__(self, parent)
         self.document().contentsChanged.connect(self.updateSize)
 
+    def keyPressEvent(self, event):
+        text = event.text()
+        if not text \
+        or event.modifiers() & self.ALLOWED_MODIFIERS \
+        or text in self.ALLOWED_CHARACTERS \
+        or text.upper() in self.morse.encoding:
+            super().keyPressEvent(event)
+        else:
+            print(repr(text))
+
+    def insertFromMimeData(self, source):
+        if source:
+            text = ''.join(c for c in source.text() if c in self.ALLOWED_CHARACTERS or c.upper() in self.morse.encoding)
+            if text:
+                source = QMimeData() # Doesn't work without it
+                source.setText(text)
+                super().insertFromMimeData(source)
+
     def updateSize(self):
-        self.setFixedHeight(self.document().size().height() * QFontMetrics(self.font()).height() \
-                + self.contentsMargins().top() + self.contentsMargins().bottom() + self.HEIGHT_ADJUSTMENT)
+        self.setFixedHeight((self.document().size().height() + 1) * QFontMetrics(self.font()).height() \
+                + self.contentsMargins().top() + self.contentsMargins().bottom() + self.HEIGHT_ADJUSTMENT) # ToDo: Remove +1 for extra line
         if self.callback:
             self.callback(self.toPlainText()) # pylint: disable=E1102
 
@@ -132,19 +141,23 @@ class MessageFrame(QFrame):
         cls.parentLayout = parentWidget.layout()
         cls.sendCallback = sendCallback
         cls.morse = Morse()
+        MessageTextEdit.configure(cls.morse)
 
     @staticmethod
     def streamReader(stream): # generator
         for line in stream:
             line = line.strip()
-            if line and not line.startswith('#'):
+            if not line.startswith('#'):
                 yield line
 
     def __init__(self, stream = None):
         super().__init__(self.parentWidget)
         if stream:
             reader = self.streamReader(stream)
-            tokens = next(reader).split()
+            line = None
+            while not line:
+                line = next(reader)
+            tokens = line.split()
             state = self.STATE_MARKS.index(tokens[0])
             if state is self.OUTGOING:
                 assert len(tokens) == 1
@@ -170,10 +183,13 @@ class MessageFrame(QFrame):
         self.setTimeStamp(timeStamp)
         self.messageTextEdit.callback = self.updateText
         self.messageTextEdit.setPlainText(text)
-        if state != self.OUTGOING:
+        if state is self.OUTGOING:
+            index = self.HEAD_SIZE
+        else:
+            index = self.parentLayout.count() - self.TAIL_SIZE
             self.updateBits(bits)
-        self.parentLayout.insertWidget(self.parentLayout.count() - self.TAIL_SIZE, self)
-        self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE - 1, 0)
+        self.parentLayout.insertWidget(index, self)
+        self.parentLayout.setStretch(index, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
         if not stream:
             self.messageTextEdit.setFocus()
@@ -186,7 +202,7 @@ class MessageFrame(QFrame):
 
     def setTimeStamp(self, timeStamp):
         self.timeStamp = timeStamp
-        self.timeLabel.setText('в ' + timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT) if timeStamp else '')
+        self.timeLabel.setText(timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT) if timeStamp else '')
 
     def addToken(self, bits = '', code = '', char = '', first = False, last = False):
         c = self.bitsGridLayout.columnCount()
@@ -233,8 +249,9 @@ class MessageFrame(QFrame):
         for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
             dataFile.write('\n')
             textFile.write(widget.textStr())
-            textFile.write('\n')
-            dataFile.write(widget.dataStr())
+            if widget.state is not cls.OUTGOING:
+                textFile.write('\n')
+                dataFile.write(widget.dataStr())
 
     @classmethod
     def readData(cls, dataFile):
@@ -246,7 +263,7 @@ class MessageFrame(QFrame):
                     MessageFrame(dataFile)
             except StopIteration:
                 pass
-        if cls.parentLayout.count() <= cls.HEAD_SIZE + cls.TAIL_SIZE:
+        if cls.parentLayout.count() <= cls.HEAD_SIZE + cls.TAIL_SIZE or cls.parentLayout.itemAt(0).widget().state is not cls.OUTGOING:
             MessageFrame()
 
     def resetOutgoing(self):
