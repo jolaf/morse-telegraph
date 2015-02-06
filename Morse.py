@@ -191,14 +191,15 @@ class Morse(object):
             ret.append(self.decodeWord(codeWord, defaultChar))
         return ' '.join(ret)
 
-    def encodeMessage(self, message, defaultCode = None):
-        return self.encodePhrase((START, message, END), defaultCode)
+    def encodeMessage(self, message, defaultCode = None, wrapForTransmission = False):
+        return self.encodePhrase((START, message, END) if wrapForTransmission else message, defaultCode)
 
     def decodeMessage(self, codePhrase, defaultChar = None):
         return self.decodePhrase(codePhrase, defaultChar)
 
-    def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT):
-        return ''.join(c * bitsPerDit for c in chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)))
+    def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
+        ret = PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)
+        return ''.join(c * bitsPerDit for c in chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, ret)) if wrapForTransmission else ret
 
     def parseBits(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
         class Cluster(object):
@@ -264,8 +265,8 @@ class Morse(object):
                     ret.append((token, SPACE if length <= maxDah else WORD_SPACE, ''))
         return tuple(ret)
 
-    def messageToBits(self, message):
-        return self.codeToBits(self.encodeMessage(message))
+    def messageToBits(self, message, wrapForTransmission = False):
+        return self.codeToBits(self.encodeMessage(message, wrapForTransmission = wrapForTransmission), wrapForTransmission = wrapForTransmission)
 
 class MorseTest(TestCase):
     def setUp(self):

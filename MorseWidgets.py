@@ -122,6 +122,7 @@ class MessageFrame(QFrame):
     CORRECT = 3
     STATE_MARKS = '!><$'
     SPLITTER = reCompile(r'\s*\n\s*')
+    SPACE_CUTTER = reCompile(r'\s+')
     stateTexts = []
 
     @classmethod
@@ -145,32 +146,32 @@ class MessageFrame(QFrame):
             reader = self.streamReader(stream)
             tokens = next(reader).split()
             state = self.STATE_MARKS.index(tokens[0])
-            if state == self.OUTGOING:
+            if state is self.OUTGOING:
                 assert len(tokens) == 1
-                self.timeStamp = None
-                text = next(reader).replace('\\n', '\n')
-                self.bits = self.morse.messageToBits(self.SPLITTER.sub(' = ', text))
+                timeStamp = None
+                text = next(reader)
             else:
                 assert len(tokens) == 2
-                self.timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
-                self.bits = next(reader)
+                timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
                 text = next(reader)
+                bits = next(reader)
         else:
             state = self.OUTGOING
-            self.timeStamp = None
-            self.bits = b''
+            timeStamp = None
             text = ''
+        text = text.replace('\\n', '\n')
         uic.loadUi(self.uiFile, self)
         if not self.stateTexts:
             self.stateTexts.extend(label.text() for label in (self.outgoingLabel, self.sentLabel, self.receivedLabel, self.receivedLabel))
         # self.textEdit.setPlaceholderText("Вводите текст сообщения здесь") # ToDo: Add in Designer after moving to Qt 5.3+
-        self.setTime()
-        self.messageTextEdit.setPlainText(text)
-        self.setBits()
         self.resetOutgoingButton.clicked.connect(self.resetOutgoing)
         self.sendOutgoingButton.clicked.connect(self.sendOutgoing)
-        self.messageTextEdit.callback = self.textUpdatedCallback
         self.setState(state)
+        self.setTimeStamp(timeStamp)
+        self.messageTextEdit.callback = self.updateText
+        self.messageTextEdit.setPlainText(text)
+        if state != self.OUTGOING:
+            self.updateBits(bits)
         self.parentLayout.insertWidget(self.parentLayout.count() - self.TAIL_SIZE, self)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE - 1, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
@@ -183,8 +184,9 @@ class MessageFrame(QFrame):
         self.controlStackedWidget.setCurrentIndex(state)
         self.messageTextEdit.setReadOnly(state in (self.SENT, self.RECEIVED))
 
-    def setTime(self):
-        self.timeLabel.setText('в ' + self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT) if self.timeStamp else '')
+    def setTimeStamp(self, timeStamp):
+        self.timeStamp = timeStamp
+        self.timeLabel.setText('в ' + timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT) if timeStamp else '')
 
     def addToken(self, bits = '', code = '', char = '', first = False, last = False):
         c = self.bitsGridLayout.columnCount()
@@ -192,16 +194,23 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.addWidget(CodeLabel(self, code), 1, c)
         self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
 
-    def setBits(self):
+    def updateBits(self, bits):
+        self.bits = bits # ToDo?
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
         self.addToken(first = True)
         allBits = []
-        for (bits, code, char) in self.morse.parseBits(self.bits):
+        for (bits, code, char) in self.morse.parseBits(bits):
             self.addToken(bits, code, char)
             allBits.append(bits)
         self.addToken(last = True)
-        self.bits = ''.join(allBits)
+        #self.bits = ''.join(allBits) # ToDo?
+
+    def updateText(self, text):
+        if self.state is self.OUTGOING:
+            self.sendOutgoingButton.setDisabled(not text)
+            self.resetOutgoingButton.setDisabled(not text)
+            self.updateBits(self.morse.messageToBits(self.SPACE_CUTTER.sub(' ', text.strip().replace('\n', ' = '))))
 
     def dataStr(self):
         state = self.STATE_MARKS[self.state]
@@ -223,9 +232,9 @@ class MessageFrame(QFrame):
         textFile.write('# MorseControl text file')
         for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
             dataFile.write('\n')
-            dataFile.write(widget.dataStr())
-            textFile.write('\n')
             textFile.write(widget.textStr())
+            textFile.write('\n')
+            dataFile.write(widget.dataStr())
 
     @classmethod
     def readData(cls, dataFile):
@@ -240,19 +249,12 @@ class MessageFrame(QFrame):
         if cls.parentLayout.count() <= cls.HEAD_SIZE + cls.TAIL_SIZE:
             MessageFrame()
 
-    def textUpdatedCallback(self, text):
-        if self.state == self.OUTGOING:
-            text = self.messageTextEdit.toPlainText()
-            self.sendOutgoingButton.setDisabled(not text)
-            self.resetOutgoingButton.setDisabled(not text)
-
     def resetOutgoing(self):
         self.messageTextEdit.clear()
         self.messageTextEdit.setFocus()
 
     def sendOutgoing(self):
         self.sendCallback(self.bits)
-        self.timeStamp = datetime.now()
         self.setState(self.SENT)
-        self.setTime()
+        self.setTimeStamp(datetime.now())
         MessageFrame()
