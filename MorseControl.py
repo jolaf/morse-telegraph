@@ -13,7 +13,7 @@ from traceback import format_exc
 
 try:
     from PyQt5 import uic
-    from PyQt5.QtCore import QByteArray, QCoreApplication, QDateTime, QObject, QSettings, pyqtSignal
+    from PyQt5.QtCore import QByteArray, QCoreApplication, QDateTime, QObject, QSettings, QTranslator, pyqtSignal
     from PyQt5.QtWidgets import QApplication, QDesktopWidget, QDialog, QLabel, QMessageBox, QMainWindow
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
@@ -308,6 +308,9 @@ if __name__ == '__main__': # Not using main() function per recommendation for Py
     try:                   # http://pyqt.sourceforge.net/Docs/PyQt5/pyqt4_differences.html#object-destruction-on-exit
         application = QApplication(argv)
         setlocale(LC_ALL, ('ru_RU', 'UTF-8')) # doesn't work on Ubuntu if performed earlier
+        translator = QTranslator()
+        if translator.load('qt_ru'):
+            application.installTranslator(translator)
         morseControl = MorseControl(argv[1:]) # retain reference
         retCode = application.exec_()
         application.deleteLater()

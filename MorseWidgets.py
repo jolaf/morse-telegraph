@@ -9,7 +9,7 @@ try:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt, QMimeData
     from PyQt5.QtGui import QFontMetrics
-    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QPlainTextEdit, QScrollArea
+    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
@@ -103,8 +103,6 @@ class MessageTextEdit(QPlainTextEdit):
         or text in self.ALLOWED_CHARACTERS \
         or text.upper() in self.morse.encoding:
             super().keyPressEvent(event)
-        else:
-            print(repr(text))
 
     def insertFromMimeData(self, source):
         if source:
@@ -128,7 +126,7 @@ class MessageFrame(QFrame):
     OUTGOING = 0
     SENT = 1
     RECEIVED = 2
-    CORRECT = 3
+    EDIT = 3
     STATE_MARKS = '!><$'
     SPLITTER = reCompile(r'\s*\n\s*')
     SPACE_CUTTER = reCompile(r'\s+')
@@ -152,6 +150,7 @@ class MessageFrame(QFrame):
 
     def __init__(self, stream = None):
         super().__init__(self.parentWidget)
+        self.savedText = None
         if stream:
             reader = self.streamReader(stream)
             line = None
@@ -179,6 +178,11 @@ class MessageFrame(QFrame):
         # self.textEdit.setPlaceholderText("Вводите текст сообщения здесь") # ToDo: Add in Designer after moving to Qt 5.3+
         self.resetOutgoingButton.clicked.connect(self.resetOutgoing)
         self.sendOutgoingButton.clicked.connect(self.sendOutgoing)
+        self.deleteSentButton.clicked.connect(self.deleteSaved)
+        self.deleteReceivedButton.clicked.connect(self.deleteSaved)
+        self.editReceivedButton.clicked.connect(self.editReceived)
+        self.cancelReceivedButton.clicked.connect(self.cancelEdit)
+        self.saveReceivedButton.clicked.connect(self.saveEdit)
         self.setState(state)
         self.setTimeStamp(timeStamp)
         self.messageTextEdit.callback = self.updateText
@@ -199,6 +203,7 @@ class MessageFrame(QFrame):
         self.stateStackedWidget.setCurrentIndex(state)
         self.controlStackedWidget.setCurrentIndex(state)
         self.messageTextEdit.setReadOnly(state in (self.SENT, self.RECEIVED))
+        self.messageTextEdit.updateSize()
 
     def setTimeStamp(self, timeStamp):
         self.timeStamp = timeStamp
@@ -227,13 +232,21 @@ class MessageFrame(QFrame):
             self.sendOutgoingButton.setDisabled(not text)
             self.resetOutgoingButton.setDisabled(not text)
             self.updateBits(self.morse.messageToBits(self.SPACE_CUTTER.sub(' ', text.strip().replace('\n', ' = '))))
+        elif self.state is self.EDIT:
+            self.saveReceivedButton.setDisabled(text == self.savedText)
 
     def dataStr(self):
-        state = self.STATE_MARKS[self.state]
-        if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, '\\n'.join(self.messageTextEdit.toPlainText().splitlines()))
+        if self.state is self.EDIT:
+            state = self.RECEIVED
+            text = self.savedText
         else:
-            return '%s\n%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(self.messageTextEdit.toPlainText().splitlines()), self.bits)
+            state = self.state
+            text = self.messageTextEdit.toPlainText()
+        state = self.STATE_MARKS[state]
+        if self.state is self.OUTGOING:
+            return '%s\n%s\n' % (state, '\\n'.join(text.splitlines()))
+        else:
+            return '%s\n%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(text.splitlines()), self.bits)
 
     def textStr(self):
         state = self.stateTexts[self.state]
@@ -275,3 +288,22 @@ class MessageFrame(QFrame):
         self.setState(self.SENT)
         self.setTimeStamp(datetime.now())
         MessageFrame()
+
+    def deleteSaved(self):
+        ret = QMessageBox.question(self, "Удалить телеграмму?", "Вы уверены, что хотите удалить данную телеграмму?")
+        if ret == QMessageBox.Yes:
+            self.setParent(None)
+
+    def editReceived(self):
+        self.savedText = self.messageTextEdit.toPlainText()
+        self.setState(self.EDIT)
+        self.messageTextEdit.setFocus()
+
+    def cancelEdit(self):
+        self.messageTextEdit.setPlainText(self.savedText)
+        self.savedText = None
+        self.setState(self.RECEIVED)
+
+    def saveEdit(self):
+        self.savedText = None
+        self.setState(self.RECEIVED)
