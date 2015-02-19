@@ -26,8 +26,15 @@ from MorseWidgets import MessageFrame
 #
 # ToDo
 # Fix segmentation faults - do not hold references to Qt objects
-# Try to use QPlainTextEdit for message text instead of QLabel
-# In MorseMessage, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
+# When sending message, add СОЕД, НЧЛ, КНЦ
+# When deconding incoming message, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
+# Make displayed telegraph tape 100% wide
+# For empty message, reduce the message widget height
+# Generate actual UART commands for sent messages
+# Adequately decode incoming message UART commands
+# Create acceptable emulator for sending and receiving messages
+# Auto-submit edited incoming message when exiting
+# Verify operation on Windows
 #
 
 LONG_DATETIME_FORMAT = 'yyyy.MM.dd hh:mm:ss'
