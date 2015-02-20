@@ -64,17 +64,21 @@ UART_FF_WAIT = 'wait'
 UART_FF_GOTO = 'goto'
 UART_FF_LIGHT = 'light'
 
-UART_MORSE_BEEP = 'beep' # dash-dot-dot
-UART_MORSE_SET_CONNECT_BEEP = 'setConnectBeep'
-UART_MORSE_SET_RX_BEEP = 'setRxBeep'
-UART_MORSE_SET_TX_BEEP = 'setTxBeep'
+UART_MORSE_BEEP = 'morse'
+UART_MORSE_SPEED = 'speed'
+UART_MORSE_UART_BEEP = 'uartBeep'
+UART_MORSE_CONNECT_BEEP = 'connectBeep'
+UART_MORSE_RX_BEEP = 'setRxBeep'
+UART_MORSE_TX_BEEP = 'setTxBeep'
 
 UART_MORSE_SWITCH_LINE = 'switchLine'
 UART_MORSE_SEND_MESSAGE = 'sendMessage'
 UART_MORSE_PRINT_MESSAGE = 'printMessage'
 
 UART_MORSE_LINE = 'line'
-UART_MORSE_RECEIVED_MESSAGE = 'receivedMessage'
+UART_MORSE_RX = 'rx'
+UART_MORSE_TX = 'tx'
+UART_MORSE_PRINT = 'print'
 
 # Command definitions
 
@@ -111,16 +115,17 @@ ffGetCommand = Command(UART_FF_GET, '', UART_FF)
 ffSetCommand = Command(UART_FF_SET, 's*', UART_ACK)
 ffResponse = Command(UART_FF, 's*')
 
-morseBeep = Command(UART_MORSE_BEEP, '', UART_ACK)
-morseSetConnectBeep = Command(UART_MORSE_SET_CONNECT_BEEP, 'd', UART_ACK)
-morseSetRxBeep = Command(UART_MORSE_SET_RX_BEEP, 'd', UART_ACK)
-morseSetTxBeep = Command(UART_MORSE_SET_TX_BEEP, 'd', UART_ACK)
-morseSwitchLine = Command(UART_MORSE_SWITCH_LINE, 'd', UART_MORSE_LINE)
+morseBeepCommand = Command(UART_MORSE_BEEP, '', UART_ACK)
+morseSpeedCommand = Command(UART_MORSE_SPEED, 'd', UART_ACK)
+morseUartBeepCommand = Command(UART_MORSE_UART_BEEP, 'd', UART_ACK)
+morseConnectBeepCommand = Command(UART_MORSE_CONNECT_BEEP, 'd', UART_ACK)
+morseRxBeepCommand = Command(UART_MORSE_RX_BEEP, 'd', UART_ACK)
+morseTxBeepCommand = Command(UART_MORSE_TX_BEEP, 'd', UART_ACK)
+morseLineCommand = Command(UART_MORSE_LINE, 'd', UART_ACK)
 
-morseSendMessage = Command(UART_MORSE_SEND_MESSAGE, 's', UART_ACK)
-morsePrintMessage = Command(UART_MORSE_PRINT_MESSAGE, 's', UART_ACK)
+morseTxCommand = Command(UART_MORSE_TX, 's', UART_ACK)
+morsePrintCommand = Command(UART_MORSE_PRINT, 's', UART_ACK)
 
-morseLineResponse = Command(UART_MORSE_LINE, 'd')
-morseReceivedMessageResponse = Command(UART_MORSE_RECEIVED_MESSAGE, 's')
+morseRxResponse = Command(UART_MORSE_RX, 's')
 
 Command.linkReplies()

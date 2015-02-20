@@ -19,7 +19,7 @@ except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
 from UARTTextProtocol import Command, COMMAND_MARKER
-from UARTTextCommands import ackResponse, morseBeep
+from UARTTextCommands import ackResponse, morseBeepCommand
 from SerialPort import SerialPort, DT, TIMEOUT
 from MorseWidgets import MessageFrame
 
@@ -179,7 +179,7 @@ class MorseControl(QMainWindow):
         self.loadSettings()
         self.loadData()
         self.comConnect.connect(self.processConnect)
-        self.port = SerialPort(self.logger, morseBeep.prefix, ackResponse.prefix,
+        self.port = SerialPort(self.logger, morseBeepCommand.prefix, ackResponse.prefix,
                                self.comConnect.emit, None, self.portLabel.setPortStatus.emit,
                                EmulatedSerial() if self.emulated else None, (115200,))
         if self.savedMaximized:
