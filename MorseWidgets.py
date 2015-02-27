@@ -7,9 +7,9 @@ from re import compile as reCompile
 
 try:
     from PyQt5 import uic
-    from PyQt5.QtCore import Qt, QMimeData
+    from PyQt5.QtCore import Qt, QMimeData, QObjectCleanupHandler, QTimer
     from PyQt5.QtGui import QFontMetrics
-    from PyQt5.QtWidgets import QFrame, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QScrollArea
+    from PyQt5.QtWidgets import QFrame, QGridLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
@@ -49,6 +49,12 @@ class VerticalScrollArea(QScrollArea):
         self.setMinimumWidth(self.widget().sizeHint().width() + self.verticalScrollBar().width())
         QScrollArea.resizeEvent(self, event)
 
+class BitsGridLayout(QGridLayout):
+    def __init__(self, parent):
+        QGridLayout.__init__(self, parent)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setSpacing(0)
+
 class MorseLabel(QLabel):
     def __init__(self, parent, text = ''):
         super().__init__(text, parent)
@@ -64,7 +70,7 @@ class BitsLabel(MorseLabel):
         font-family: Courier New, Courier, monospace
     '''
     def __init__(self, parent, bits = '', first = False, last = False):
-        super().__init__(parent, ''.join(self.BIT_CHARS[c] for c in bits))
+        super().__init__(parent, ''.join(self.BIT_CHARS[c] for c in bits) or ' ')
         self.setStyleSheet(self.STYLE_SHEET + ('; border-left: 1px solid' if first else '') + ('; border-right: 1px solid' if last else ''))
         font = self.font()
         font.setBold(True)
@@ -173,6 +179,8 @@ class MessageFrame(QFrame):
             text = ''
         text = text.replace('\\n', '\n')
         uic.loadUi(self.uiFile, self)
+        self.textToUpdate = None
+        self.textUpdateEventCounter = 0
         if not self.stateTexts:
             self.stateTexts.extend(label.text() for label in (self.outgoingLabel, self.sentLabel, self.receivedLabel, self.receivedLabel))
         # self.textEdit.setPlaceholderText("Вводите текст сообщения здесь") # ToDo: Add in Designer after moving to Qt 5.3+
@@ -214,26 +222,37 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.addWidget(BitsLabel(self, bits, first, last), 0, c)
         self.bitsGridLayout.addWidget(CodeLabel(self, code), 1, c)
         self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
+        self.bitsGridLayout.setColumnStretch(c, last)
 
     def updateBits(self, bits):
         self.bits = bits # ToDo?
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
+        QObjectCleanupHandler().add(self.bitsGridLayout) # pylint: disable=E0203
+        self.bitsGridLayout = BitsGridLayout(self.bitsWidget)
         self.addToken(first = True)
         allBits = []
         for (bits, code, char) in self.morse.parseBits(bits):
             self.addToken(bits, code, char)
             allBits.append(bits)
         self.addToken(last = True)
+        self.bitsWidget.setLayout(self.bitsGridLayout)
         #self.bits = ''.join(allBits) # ToDo?
 
     def updateText(self, text):
         if self.state is self.OUTGOING:
             self.sendOutgoingButton.setDisabled(not text)
             self.resetOutgoingButton.setDisabled(not text)
-            self.updateBits(self.morse.messageToBits(self.SPACE_CUTTER.sub(' ', text.strip().replace('\n', ' = '))))
+            self.textToUpdate = text
+            self.textUpdateEventCounter += 1
+            QTimer.singleShot(0, self.doUpdateText)
         elif self.state is self.EDIT:
             self.saveReceivedButton.setDisabled(text == self.savedText)
+
+    def doUpdateText(self):
+        self.textUpdateEventCounter -= 1
+        if not self.textUpdateEventCounter:
+            self.updateBits(self.morse.messageToBits(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = '))))
 
     def dataStr(self):
         if self.state is self.EDIT:
