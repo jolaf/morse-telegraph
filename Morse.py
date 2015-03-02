@@ -153,9 +153,10 @@ class Morse(object):
 
     def encodeWord(self, word, defaultCode = None):
         assert ' ' not in word, "Encoding spaces in word is not allowed: %r" % word
-        ret = self.encodeSymbol(word, '')
-        if ret:
-            return ret
+        if isinstance(word, str):
+            ret = self.encodeSymbol(word, '')
+            if ret:
+                return ret
         return SPACE.join(self.encodeSymbol(char, defaultCode) for char in word)
 
     def decodeWord(self, codeWord, defaultChar = None):
@@ -199,7 +200,20 @@ class Morse(object):
 
     def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
         ret = PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)
-        return ''.join(c * bitsPerDit for c in chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, ret)) if wrapForTransmission else ret
+        return ''.join(c * bitsPerDit for c in (chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, ret) if wrapForTransmission else ret)) # pylint: disable=C0325
+
+    def parseMessage(self, message, bitsPerDit = BITS_PER_DIT):
+        ret = []
+        for char in message.strip():
+            if char == SPACE:
+                ret.append((self.codeToBits(WORD_SPACE + SPACE, bitsPerDit), WORD_SPACE, SPACE))
+            else:
+                if ret and ret[-1][-1] != SPACE:
+                    ret.append((self.codeToBits(SPACE + SPACE, bitsPerDit), SPACE, ''))
+                code = self.encodeSymbol(char)
+                bits = self.codeToBits(code, bitsPerDit)
+                ret.append((bits, code, self.decodeSymbol(code)))
+        return tuple(ret)
 
     def parseBits(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
         class Cluster(object):
@@ -262,24 +276,24 @@ class Morse(object):
                     groupCode = []
                     groupOK = True
                 if length: # not the last token
-                    ret.append((token, SPACE if length <= maxDah else WORD_SPACE, ''))
+                    ret.append((token, SPACE if length <= maxDah else WORD_SPACE, '' if length <= maxDah else SPACE))
         return tuple(ret)
 
-    def messageToBits(self, message, wrapForTransmission = False):
-        return self.codeToBits(self.encodeMessage(message, wrapForTransmission = wrapForTransmission), wrapForTransmission = wrapForTransmission)
+    def messageToBits(self, message, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
+        return self.codeToBits(self.encodeMessage(message, wrapForTransmission = wrapForTransmission), bitsPerDit, wrapForTransmission)
 
 class MorseTest(TestCase):
     def setUp(self):
         self.morse = Morse()
 
     def testEncode(self):
-        chars = ['1', 'Д', '9', '?', 'Ч', 'Б', 'Ш', '.', 'Г', '4', 'Ь', 'Ъ', 'Й', 'О', ';', 'К', 'Ы', 'С', ':', 'A', 'М', '5', '(', ')', 'Ф', 'Ѳ', 'Л', '+', '3', 'И', 'I', 'Ѵ', 'END', 'У', 'START', '-', '8', '!', 'Э', '7', '2', 'Е', 'Ё', 'Ѣ', 'Ж', 'Ю', 'Ц', "'", 'Н', '=', 'Щ', 'Х', '*', '6', 'П', '0', 'В', '/', '\\', 'Р', 'Я', 'Т', '"', 'З']
+        chars = ['1', 'Д', '9', '?', 'Ч', 'Б', 'Ш', '.', 'Г', '4', 'Ь', 'Ъ', 'Й', 'О', ';', 'К', 'Ы', 'С', ':', 'А', 'М', '5', '(', ')', 'Ф', 'Ѳ', 'Л', '+', '3', 'И', 'I', 'Ѵ', 'КНЦ', 'У', 'НЧЛ', '-', '8', '!', 'Э', '7', '2', 'Е', 'Ё', 'Ѣ', 'Ж', 'Ю', 'Ц', "'", 'Н', '=', 'Щ', 'Х', '*', '6', 'П', '0', 'В', '/', '\\', 'Р', 'Я', 'Т', '"', 'З']
         codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- -..- .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--.- ..-. ..-. .-.. .-.-. ...-- .. .. .. ..-.- ..- -.-.- -....- ---.. --..-- ..-.. --... ..--- . . . ...- ..-- -.-. .----. -. -...- --.- .... .... -.... .--. ----- .-- -..-. -..-. .-. .-.- - .-..-. --..'
         self.assertEqual(self.morse.encodeWord(chars), codes)
 
     def testDecode(self):
         codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- --.-- .--.-. .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--. ..-. .-.. .-.-. ...-- .. ..-.- ...-.- ..- -.-.- -....- ---.. --..-- ..-.. --... .-.-.- ..--- . ...- ..-- -.-. .----. -. -...- --.- .... -.... .--. ----- .-- -..-. .-. .-.- - .-..-. --..'
-        chars = '1Д9?ЧБШ.Г4ЬЬЬЙО;КЫС:AМ5((ФЛ+3ИENDENDУSTART-8!Э7,2ЕЖЮЦ\'Н=ЩХ6П0В/РЯТ"З'
+        chars = '1Д9?ЧБШ.Г4ЬЬЬЙО;КЫС:АМ5((ФЛ+3ИКНЦКНЦУНЧЛ-8!Э7,2ЕЖЮЦ\'Н=ЩХ6П0В/РЯТ"З'
         self.assertEqual(self.morse.decodeWord(codes), chars)
 
     # ToDo: Create more tests

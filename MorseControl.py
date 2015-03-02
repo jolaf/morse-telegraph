@@ -26,14 +26,12 @@ from MorseWidgets import MessageFrame
 #
 # ToDo
 # Fix segmentation faults - do not hold references to Qt objects
-# When sending message, add СОЕД, НЧЛ, КНЦ
-# When deconding incoming message, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
-# Make displayed telegraph tape 100% wide
-# For empty message, reduce the message widget height
+# When decoding incoming message, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
+# -For empty message, reduce the message widget height
 # Generate actual UART commands for sent messages
 # Adequately decode incoming message UART commands
 # Create acceptable emulator for sending and receiving messages
-# Auto-submit edited incoming message when exiting
+# +Auto-submit edited incoming message when exiting
 # Verify operation on Windows
 #
 
@@ -231,7 +229,7 @@ class MorseControl(QMainWindow):
             self.port.write(data)
 
     def sendMessage(self, message):
-        pass
+        print('>>', message)
 
     def closeEvent(self, event):
         if self.askForExit():

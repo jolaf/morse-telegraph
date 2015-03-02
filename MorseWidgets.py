@@ -8,7 +8,7 @@ from re import compile as reCompile
 try:
     from PyQt5 import uic
     from PyQt5.QtCore import Qt, QMimeData, QObjectCleanupHandler, QTimer
-    from PyQt5.QtGui import QFontMetrics
+    from PyQt5.QtGui import QFontMetrics, QTextCursor
     from PyQt5.QtWidgets import QFrame, QGridLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QScrollArea
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
@@ -74,7 +74,7 @@ class BitsLabel(MorseLabel):
         self.setStyleSheet(self.STYLE_SHEET + ('; border-left: 1px solid' if first else '') + ('; border-right: 1px solid' if last else ''))
         font = self.font()
         font.setBold(True)
-        font.setStretch(30)
+        #font.setStretch(30)
         font.setLetterSpacing(font.PercentageSpacing, 50)
         self.setFont(font)
 
@@ -199,12 +199,14 @@ class MessageFrame(QFrame):
             index = self.HEAD_SIZE
         else:
             index = self.parentLayout.count() - self.TAIL_SIZE
-            self.updateBits(bits)
+            self.bits = bits
+            self.updateBits(self.morse.parseBits(bits))
         self.parentLayout.insertWidget(index, self)
         self.parentLayout.setStretch(index, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
-        if not stream:
+        if state is self.OUTGOING:
             self.messageTextEdit.setFocus()
+            self.messageTextEdit.moveCursor(QTextCursor.End)
 
     def setState(self, state):
         self.state = state
@@ -225,19 +227,15 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.setColumnStretch(c, last)
 
     def updateBits(self, bits):
-        self.bits = bits # ToDo?
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
         QObjectCleanupHandler().add(self.bitsGridLayout) # pylint: disable=E0203
         self.bitsGridLayout = BitsGridLayout(self.bitsWidget)
         self.addToken(first = True)
-        allBits = []
-        for (bits, code, char) in self.morse.parseBits(bits):
+        for (bits, code, char) in bits:
             self.addToken(bits, code, char)
-            allBits.append(bits)
         self.addToken(last = True)
         self.bitsWidget.setLayout(self.bitsGridLayout)
-        #self.bits = ''.join(allBits) # ToDo?
 
     def updateText(self, text):
         if self.state is self.OUTGOING:
@@ -251,39 +249,35 @@ class MessageFrame(QFrame):
 
     def doUpdateText(self):
         self.textUpdateEventCounter -= 1
-        if not self.textUpdateEventCounter:
-            self.updateBits(self.morse.messageToBits(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = '))))
+        if self.textUpdateEventCounter == 0:
+            bits = self.morse.parseMessage(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = ')))
+            self.bits = ''.join(b[0] for b in bits)
+            self.updateBits(bits)
 
     def dataStr(self):
-        if self.state is self.EDIT:
-            state = self.RECEIVED
-            text = self.savedText
+        state = self.RECEIVED if self.state is self.EDIT else self.state
+        text = '\\n'.join(self.messageTextEdit.toPlainText().splitlines())
+        stateMark = self.STATE_MARKS[state]
+        if state is self.OUTGOING:
+            return ('\n%s\n%s\n' % (stateMark, text)) if text else ''
         else:
-            state = self.state
-            text = self.messageTextEdit.toPlainText()
-        state = self.STATE_MARKS[state]
-        if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, '\\n'.join(text.splitlines()))
-        else:
-            return '%s\n%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), '\\n'.join(text.splitlines()), self.bits)
+            return '\n%s\n%s\n%s\n' % (' '.join((stateMark, self.timeStamp.strftime(self.STORE_DATETIME_FORMAT))), text, self.bits)
 
     def textStr(self):
-        state = self.stateTexts[self.state]
+        stateText = self.stateTexts[self.state]
+        text = self.messageTextEdit.toPlainText()
         if self.state is self.OUTGOING:
-            return '%s\n%s\n' % (state, self.messageTextEdit.toPlainText())
+            return ('\n%s\n%s\n' % (stateText, text)) if text else ''
         else:
-            return '%s\n%s\n' % (' '.join((state, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), self.messageTextEdit.toPlainText())
+            return '\n%s\n%s\n' % (' '.join((stateText, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), text)
 
     @classmethod
     def writeData(cls, dataFile, textFile):
         dataFile.write('# MorseControl data file')
         textFile.write('# MorseControl text file')
         for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
-            dataFile.write('\n')
+            dataFile.write(widget.dataStr())
             textFile.write(widget.textStr())
-            if widget.state is not cls.OUTGOING:
-                textFile.write('\n')
-                dataFile.write(widget.dataStr())
 
     @classmethod
     def readData(cls, dataFile):
@@ -303,7 +297,7 @@ class MessageFrame(QFrame):
         self.messageTextEdit.setFocus()
 
     def sendOutgoing(self):
-        self.sendCallback(self.bits)
+        self.sendCallback(self.morse.messageToBits(self.messageTextEdit.toPlainText(), True))
         self.setState(self.SENT)
         self.setTimeStamp(datetime.now())
         MessageFrame()
