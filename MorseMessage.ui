@@ -10,7 +10,7 @@
   </property>
   <layout class="QVBoxLayout" name="messageLayout" stretch="0,1,0">
    <item>
-    <layout class="QHBoxLayout" name="headerLayout" stretch="0,0,1,0">
+    <layout class="QHBoxLayout" name="headerLayout" stretch="0,0,1,0,0">
      <item>
       <widget class="QStackedWidget" name="stateStackedWidget">
        <property name="statusTip">
@@ -275,6 +275,13 @@
          </item>
         </layout>
        </widget>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="printButton">
+       <property name="text">
+        <string>Напечатать</string>
+       </property>
       </widget>
      </item>
     </layout>

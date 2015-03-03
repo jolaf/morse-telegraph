@@ -22,7 +22,7 @@ REPEAT = 'repeat'
 
 MAX_COMMAND_ARGS = 100
 
-MAX_COMMAND_LENGTH = 384
+MAX_COMMAND_LENGTH = 10240
 
 def nop(s):
     return s

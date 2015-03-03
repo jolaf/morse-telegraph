@@ -74,7 +74,7 @@ class BitsLabel(MorseLabel):
         self.setStyleSheet(self.STYLE_SHEET + ('; border-left: 1px solid' if first else '') + ('; border-right: 1px solid' if last else ''))
         font = self.font()
         font.setBold(True)
-        #font.setStretch(30)
+        font.setStretch(80)
         font.setLetterSpacing(font.PercentageSpacing, 50)
         self.setFont(font)
 
@@ -104,10 +104,11 @@ class MessageTextEdit(QPlainTextEdit):
 
     def keyPressEvent(self, event):
         text = event.text()
+        #or event.modifiers() & self.ALLOWED_MODIFIERS \
         if not text \
-        or event.modifiers() & self.ALLOWED_MODIFIERS \
-        or text in self.ALLOWED_CHARACTERS \
-        or text.upper() in self.morse.encoding:
+        or not event.modifiers() & self.ALLOWED_MODIFIERS \
+            and (text in self.ALLOWED_CHARACTERS \
+              or text.upper() in self.morse.encoding):
             super().keyPressEvent(event)
 
     def insertFromMimeData(self, source):
@@ -139,11 +140,13 @@ class MessageFrame(QFrame):
     stateTexts = []
 
     @classmethod
-    def configure(cls, uiFile, parentWidget, sendCallback):
+    def configure(cls, uiFile, parentWidget, sendCallback, printCallback):
         cls.uiFile = uiFile
         cls.parentWidget = parentWidget
         cls.parentLayout = parentWidget.layout()
         cls.sendCallback = sendCallback
+        cls.printCallback = printCallback
+        cls.isConnected = False
         cls.morse = Morse()
         MessageTextEdit.configure(cls.morse)
 
@@ -154,11 +157,11 @@ class MessageFrame(QFrame):
             if not line.startswith('#'):
                 yield line
 
-    def __init__(self, stream = None):
+    def __init__(self, arg = None):
         super().__init__(self.parentWidget)
         self.savedText = None
-        if stream:
-            reader = self.streamReader(stream)
+        if hasattr(arg, 'readline'):
+            reader = self.streamReader(arg)
             line = None
             while not line:
                 line = next(reader)
@@ -173,11 +176,18 @@ class MessageFrame(QFrame):
                 timeStamp = datetime.strptime(tokens[1], self.STORE_DATETIME_FORMAT)
                 text = next(reader)
                 bits = next(reader)
+        elif arg:
+            reader = None
+            state = self.RECEIVED
+            timeStamp = datetime.now()
+            bits = arg
+            text = None
         else:
             state = self.OUTGOING
             timeStamp = None
             text = ''
-        text = text.replace('\\n', '\n')
+        if text is not None:
+            text = text.replace('\\n', '\n')
         uic.loadUi(self.uiFile, self)
         self.textToUpdate = None
         self.textUpdateEventCounter = 0
@@ -191,6 +201,7 @@ class MessageFrame(QFrame):
         self.editReceivedButton.clicked.connect(self.editReceived)
         self.cancelReceivedButton.clicked.connect(self.cancelEdit)
         self.saveReceivedButton.clicked.connect(self.saveEdit)
+        self.printButton.clicked.connect(self.printMessage)
         self.setState(state)
         self.setTimeStamp(timeStamp)
         self.messageTextEdit.callback = self.updateText
@@ -198,9 +209,9 @@ class MessageFrame(QFrame):
         if state is self.OUTGOING:
             index = self.HEAD_SIZE
         else:
-            index = self.parentLayout.count() - self.TAIL_SIZE
+            index = self.HEAD_SIZE + 1 if reader is None else self.parentLayout.count() - self.TAIL_SIZE
             self.bits = bits
-            self.updateBits(self.morse.parseBits(bits))
+            self.updateBits(self.morse.parseBits(bits), text is None)
         self.parentLayout.insertWidget(index, self)
         self.parentLayout.setStretch(index, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
@@ -226,26 +237,35 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
         self.bitsGridLayout.setColumnStretch(c, last)
 
-    def updateBits(self, bits):
+    def updateBits(self, bits, saveText = False):
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
         QObjectCleanupHandler().add(self.bitsGridLayout) # pylint: disable=E0203
         self.bitsGridLayout = BitsGridLayout(self.bitsWidget)
         self.addToken(first = True)
+        if saveText:
+            text = []
         for (bits, code, char) in bits:
             self.addToken(bits, code, char)
+            if saveText:
+                text.append(char)
         self.addToken(last = True)
         self.bitsWidget.setLayout(self.bitsGridLayout)
+        if saveText:
+            self.messageTextEdit.setPlainText(''.join(text))
 
     def updateText(self, text):
         if self.state is self.OUTGOING:
-            self.sendOutgoingButton.setDisabled(not text)
+            self.sendOutgoingButton.setDisabled(not text or not self.isConnected)
             self.resetOutgoingButton.setDisabled(not text)
+            self.printButton.setDisabled(not text or not self.isConnected)
             self.textToUpdate = text
             self.textUpdateEventCounter += 1
             QTimer.singleShot(0, self.doUpdateText)
-        elif self.state is self.EDIT:
-            self.saveReceivedButton.setDisabled(text == self.savedText)
+        else:
+            self.printButton.setDisabled(not self.isConnected)
+            if self.state is self.EDIT:
+                self.saveReceivedButton.setDisabled(text == self.savedText)
 
     def doUpdateText(self):
         self.textUpdateEventCounter -= 1
@@ -270,6 +290,12 @@ class MessageFrame(QFrame):
             return ('\n%s\n%s\n' % (stateText, text)) if text else ''
         else:
             return '\n%s\n%s\n' % (' '.join((stateText, self.timeStamp.strftime(self.DISPLAY_DATETIME_FORMAT))), text)
+
+    @classmethod
+    def setConnected(cls, isConnected):
+        cls.isConnected = isConnected
+        for widget in widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE):
+            widget.messageTextEdit.updateSize()
 
     @classmethod
     def writeData(cls, dataFile, textFile):
@@ -301,6 +327,9 @@ class MessageFrame(QFrame):
         self.setState(self.SENT)
         self.setTimeStamp(datetime.now())
         MessageFrame()
+
+    def printMessage(self):
+        self.printCallback(self.morse.messageToBits(self.messageTextEdit.toPlainText(), True))
 
     def deleteSaved(self):
         ret = QMessageBox.question(self, "Удалить телеграмму?", "Вы уверены, что хотите удалить данную телеграмму?")

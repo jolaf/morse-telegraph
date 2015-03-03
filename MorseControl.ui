@@ -21,6 +21,9 @@
     </property>
     <widget class="QWidget" name="messageHistoryWidget">
      <layout class="QVBoxLayout" name="messageHistoryLayout">
+      <property name="spacing">
+       <number>9</number>
+      </property>
       <item>
        <spacer name="messageHistorySpacer"/>
       </item>

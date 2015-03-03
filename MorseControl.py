@@ -8,7 +8,7 @@ from getopt import getopt
 from locale import setlocale, LC_ALL
 from logging import getLogger, getLoggerClass, setLoggerClass, FileHandler, Formatter, Handler, INFO, NOTSET
 from sys import argv, exit # pylint: disable=W0622
-from time import sleep
+from time import sleep, time
 from traceback import format_exc
 
 try:
@@ -19,7 +19,7 @@ except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
 
 from UARTTextProtocol import Command, COMMAND_MARKER
-from UARTTextCommands import ackResponse, morseBeepCommand
+from UARTTextCommands import ackResponse, morseBeepCommand, morseTxCommand, morsePrintCommand, morseRxResponse
 from SerialPort import SerialPort, DT, TIMEOUT
 from MorseWidgets import MessageFrame
 
@@ -27,11 +27,7 @@ from MorseWidgets import MessageFrame
 # ToDo
 # Fix segmentation faults - do not hold references to Qt objects
 # When decoding incoming message, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
-# -For empty message, reduce the message widget height
-# Generate actual UART commands for sent messages
 # Adequately decode incoming message UART commands
-# Create acceptable emulator for sending and receiving messages
-# +Auto-submit edited incoming message when exiting
 # Verify operation on Windows
 #
 
@@ -74,25 +70,30 @@ class EventLogger(getLoggerClass(), QObject):
 class EmulatedSerial(object):
     def __init__(self):
         self.name = 'EMUL'
+        self.interval = 20 # emulate receiving message every 20 seconds
         self.timeout = TIMEOUT
         self.buffer = deque()
         self.ready = False
+        self.nextMessage = time() + self.interval
 
     def readline(self):
         while True:
             if self.buffer:
                 return self.buffer.popleft()
+            now = time()
+            if self.ready and (self.nextMessage is None or now > self.nextMessage):
+                self.nextMessage = now + self.interval
+                return morseRxResponse.encode('1111111111110000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110000000000000001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111')
             sleep(DT)
 
     def write(self, data):
         ret = ''
         try:
-            (tag, args) = Command.decodeCommand(data)
-            if True:
-                tag = tag # ToDo
-                args = args
+            (tag, _args) = Command.decodeCommand(data)
+            if tag:
+                ret = ackResponse.encode(0)
             else:
-                raise ValueError("Unknown command")
+                raise ValueError("Неизвестная команда")
         except ValueError as e:
             ret = str(e)
         self.buffer.append(ret)
@@ -127,6 +128,8 @@ class PortLabel(QLabel):
 
 class MorseControl(QMainWindow):
     comConnect = pyqtSignal(str)
+    comDisconnect = pyqtSignal()
+    comInput = pyqtSignal(str)
 
     def __init__(self, args):
         super().__init__()
@@ -170,16 +173,18 @@ class MorseControl(QMainWindow):
         setLoggerClass(EventLogger)
         self.logger = getLogger('MorseControl')
         self.logger.configure(self) # pylint: disable=E1103
-        self.logger.info("start")
+        self.logger.info("старт")
         # Loading messages
-        MessageFrame.configure(MESSAGE_UI_FILE_NAME, self.messageHistoryWidget, self.sendMessage)
+        MessageFrame.configure(MESSAGE_UI_FILE_NAME, self.messageHistoryWidget, self.sendMessage, self.printMessage)
         # Starting up!
         self.loadSettings()
         self.loadData()
         self.comConnect.connect(self.processConnect)
+        self.comDisconnect.connect(self.processDisconnect)
+        self.comInput.connect(self.processInput)
         self.port = SerialPort(self.logger, morseBeepCommand.prefix, ackResponse.prefix,
-                               self.comConnect.emit, None, self.portLabel.setPortStatus.emit,
-                               EmulatedSerial() if self.emulated else None, (115200,))
+                               self.comConnect.emit, self.comDisconnect.emit, self.comInput.emit, self.portLabel.setPortStatus.emit,
+                               EmulatedSerial() if self.emulated else None, (230400,))
         if self.savedMaximized:
             self.showMaximized()
         else:
@@ -193,20 +198,16 @@ class MorseControl(QMainWindow):
         return messageBox.exec_() == QMessageBox.Yes
 
     def processConnect(self, pong):
-        if self.onConnectButtonGroup.checkedButton() is self.onConnectSetColorButton:
-            self.logger.info("connected device detected, setting color")
-            self.hardwareSetColor()
-        elif self.onConnectButtonGroup.checkedButton() is self.onConnectSetProgramButton:
-            self.logger.info("connected device detected, setting program")
-            self.hardwareSetProgram()
-        elif self.onConnectButtonGroup.checkedButton() is self.onConnectGetProgramButton:
-            self.logger.info("connected device detected, got program")
-            self.hardwareGetProgram(Command.decodeCommand(pong)[1])
-        elif self.onConnectButtonGroup.checkedButton() is self.onConnectForceGetProgramButton:
-            self.logger.info("connected device detected, got program")
-            self.hardwareGetProgram(Command.decodeCommand(pong)[1], True)
+        (code,) = ackResponse.decode(pong) # pylint: disable=W0633
+        if code:
+            self.logger.warning("Ошибка подключения устройства: %d", code)
         else:
-            self.logger.info("connected device detected")
+            self.logger.info("Обнаружено подключенное устройство")
+            MessageFrame.setConnected(True)
+
+    def processDisconnect(self):
+        self.logger.warning("Устройство отключено")
+        MessageFrame.setConnected(False)
 
     def processCommand(self, command, expect = COMMAND_MARKER):
         if not self.port:
@@ -219,9 +220,21 @@ class MorseControl(QMainWindow):
                 self.logger.info("OK")
                 return args
             else:
-                self.logger.warning("Unexpected input: %s", data)
+                self.logger.warning("Неожиданные данные: %s", data)
         else:
-            self.logger.warning("command timed out")
+            self.logger.warning("истекло время ожидания выполнения команды")
+
+    def processInput(self, data):
+        data = data.strip()
+        (tag, args) = Command.decodeCommand(data)
+        if tag == morseRxResponse.tag:
+            MessageFrame(args[0])
+        elif args is not None: # unexpected valid command
+            self.logger.warning("Неожиданная команда: %s %s", tag, ' '.join(str(arg) for arg in args))
+        elif tag: # unknown command
+            self.logger.warning("Неизвестная команда %s: %s", tag, data)
+        else: # not a command
+            self.logger.warning("Неожиданные данные: %s", data)
 
     def consoleEnter(self):
         data = self.consoleEdit.getInput()
@@ -229,18 +242,21 @@ class MorseControl(QMainWindow):
             self.port.write(data)
 
     def sendMessage(self, message):
-        print('>>', message)
+        self.processCommand(morseTxCommand.encode(message), ackResponse.prefix)
+
+    def printMessage(self, message):
+        self.processCommand(morsePrintCommand.encode(message), ackResponse.prefix)
 
     def closeEvent(self, event):
         if self.askForExit():
             self.saveData()
             self.saveSettings()
-            self.logger.info("close")
+            self.logger.info("завершение")
         else:
             event.ignore()
 
     def reset(self):
-        self.logger.info("reset")
+        self.logger.info("сброс")
         self.port.reset()
 
     @staticmethod
@@ -283,7 +299,7 @@ class MorseControl(QMainWindow):
         settings = QSettings()
         self.savedMaximized = False
         if self.needLoadSettings:
-            self.logger.info("Loading settings from %s", settings.fileName())
+            self.logger.info("Загрузка настроек из %s", settings.fileName())
             try:
                 try:
                     timeStamp = settings.value('timeStamp', type = str)
@@ -297,12 +313,12 @@ class MorseControl(QMainWindow):
                     self.restoreState(settings.value('windowState', type = QByteArray))
                     self.splitter.restoreState(settings.value('splitterState', type = QByteArray))
                     settings.endGroup()
-                    self.logger.info("Loaded settings dated %s", timeStamp)
+                    self.logger.info("Загружены настройки датированные %s", timeStamp)
                     return
                 else:
-                    self.logger.info("No settings found")
+                    self.logger.info("Сохраненные настройки не найдены")
             except:
-                self.logger.exception("Error loading settings")
+                self.logger.exception("Ошибка загрузки настроек")
 
     def error(self, message):
         print("ERROR:", message)

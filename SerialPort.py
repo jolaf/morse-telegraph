@@ -27,15 +27,16 @@ class SerialPort(object):
     ERROR = 3
     NONE = 4
 
-    def __init__(self, logger, ping = None, pong = '', connectCallBack = None, readCallBack = None, portTryCallBack = None, externalPort = None, baudRates = BAUD_RATES):
+    def __init__(self, logger, ping = None, pong = '', connectCallback = None, disconnectCallback = None, readCallback = None, portTryCallback = None, externalPort = None, baudRates = BAUD_RATES):
         self.logger = logger
         self.ping = ping
         self.pong = pong
         self.baudRates = baudRates
         self.baudRate = self.baudRates[0]
-        self.connectCallBack = connectCallBack
-        self.readCallBack = readCallBack
-        self.portTryCallBack = portTryCallBack
+        self.connectCallback = connectCallback
+        self.disconnectCallback = disconnectCallback
+        self.readCallback = readCallback
+        self.portTryCallback = portTryCallback
         self.externalPort = externalPort
         self.writeBuffer = deque(maxlen = 1)
         self.port = None
@@ -53,8 +54,8 @@ class SerialPort(object):
         thread.start()
 
     def statusUpdate(self, portName, portStatus):
-        if self.portTryCallBack:
-            self.portTryCallBack(portName, portStatus)
+        if self.portTryCallback:
+            self.portTryCallback(portName, portStatus)
 
     def reader(self):
         while True:
@@ -63,14 +64,14 @@ class SerialPort(object):
                     line = self.port.readline()
                     if line:
                         self.logger.info("< %s" % line.rstrip())
-                        if time() < self.expectTimeout and line.lower().startswith(self.expectPrefix.lower()):
+                        if self.expectTimeout and time() < self.expectTimeout and line.lower().startswith(self.expectPrefix.lower()):
                             self.expectResult = line
-                        elif self.ready and self.readCallBack:
-                            self.readCallBack(line)
+                        elif self.ready and self.readCallback:
+                            self.readCallback(line)
             except Exception:
                 #from traceback import format_exc
-                #print format_exc()
-                self.logger.warning("connection broken")
+                #print(format_exc())
+                self.logger.warning("Соединение разорвано")
                 self.reset()
             sleep(DT)
 
@@ -91,9 +92,15 @@ class SerialPort(object):
                 sleep(DT)
 
     def connect(self):
+        first = True
         while True:
             while self.port:
                 sleep(DT)
+            if first:
+                first = False
+            else:
+                if self.disconnectCallback:
+                    self.disconnectCallback()
             self.statusUpdate("СКАН", self.TRYING)
             sleep(DT)
             portNames = (self.externalPort.name,) if self.externalPort else tuple(portName for (portName, _description, _address) in comports())
@@ -105,13 +112,13 @@ class SerialPort(object):
                             self.statusUpdate(displayPortName, self.TRYING)
                             self.port = self.externalPort or Serial(portName, baudrate = self.baudRate, timeout = TIMEOUT, writeTimeout = TIMEOUT)
                             self.statusUpdate(displayPortName, self.CONNECTED)
-                            self.logger.info("connected to %s at %d baud" % (portName, self.baudRate))
+                            self.logger.info("Подключен порт %s на скорости %d бод" % (portName, self.baudRate))
                             if self.ping:
                                 for _ in range(NUM_CONNECT_ATTEMPTS):
                                     pong = self.command(self.ping, self.pong, notReady = True)
                                     if pong is not None:
-                                        if self.connectCallBack:
-                                            self.connectCallBack(pong)
+                                        if self.connectCallback:
+                                            self.connectCallback(pong)
                                         self.ready = True
                                         break
                                 else:
@@ -128,7 +135,7 @@ class SerialPort(object):
                         continue
                     break
             else:
-                self.statusUpdate("No COM", self.NONE)
+                self.statusUpdate("Нет COM", self.NONE)
 
     def reset(self):
         if self.port:
