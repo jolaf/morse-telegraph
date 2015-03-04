@@ -9,7 +9,9 @@ DOT_DASH = frozenset((DOT, DASH))
 COMMA = ','
 START = 'НЧЛ'
 END = 'КНЦ'
+UNKNOWN = 'НПН'
 ERROR = 'ОШК'
+CONNECT = 'СОЕД'
 
 EXCEPTION = 'EXCEPTION'
 
@@ -90,7 +92,7 @@ RUSSIAN_CODES = {
 }
 
 class Morse(object):
-    def __init__(self, codes = RUSSIAN_CODES, errorCode = '.', defaultChar = '', defaultCode = ''): # pylint: disable=W0102
+    def __init__(self, codes = RUSSIAN_CODES, errorCode = '.', defaultChar = UNKNOWN, defaultCode = EXCEPTION): # pylint: disable=W0102
         assert codes, "Empty code table"
         self.encoding = {}
         self.decoding = {}
@@ -112,6 +114,7 @@ class Morse(object):
                 self.maxCodeLength = max(self.maxCodeLength, len(code))
         assert self.maxCodeLength
         self.errorCode = errorCode
+        self.sendErrorCode = self.errorCode * ((self.maxCodeLength + len(self.errorCode)) // len(self.errorCode))
         self.defaultChar = self._validateDefaultChar(defaultChar)
         self.defaultCode = self._validateDefaultCode(defaultCode)
 
@@ -123,11 +126,11 @@ class Morse(object):
         return code
 
     def _validateDefaultChar(self, defaultChar):
-        assert defaultChar == '' or defaultChar in self.encoding, "Unknown default character: %r" % defaultChar
+        assert defaultChar in ('', UNKNOWN, EXCEPTION) or defaultChar in self.encoding, "Unknown default character: %r" % defaultChar
         return defaultChar
 
     def _validateDefaultCode(self, defaultCode):
-        assert defaultCode == '' or defaultCode in self.decoding, "Unknown default code: %r" % defaultCode
+        assert defaultCode in ('', EXCEPTION) or defaultCode in self.decoding, "Unknown default code: %r" % defaultCode
         return defaultCode
 
     def isError(self, code):
@@ -135,6 +138,8 @@ class Morse(object):
 
     def encodeSymbol(self, char, defaultCode = None):
         assert ' ' not in char, "Encoding spaces is not allowed: %r" % char
+        if char == ERROR:
+            return self.sendErrorCode
         if defaultCode is None:
             defaultCode = self.defaultCode
         else:
@@ -199,8 +204,8 @@ class Morse(object):
         return self.decodePhrase(codePhrase, defaultChar)
 
     def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
-        ret = PAUSE.join(CODE_TO_BITS[c] for c in codePhrase)
-        return ''.join(c * bitsPerDit for c in (chain(2 * self.maxCodeLength * DIT, 7 * PAUSE, ret) if wrapForTransmission else ret)) # pylint: disable=C0325
+        ret = PAUSE.join(CODE_TO_BITS[c] for c in (chain(self.sendErrorCode * 2, '   ', codePhrase) if wrapForTransmission else codePhrase)) # pylint: disable=C0325
+        return ''.join(c * bitsPerDit for c in ret)
 
     def parseMessage(self, message, bitsPerDit = BITS_PER_DIT):
         ret = []
@@ -225,9 +230,7 @@ class Morse(object):
             def __str__(self):
                 return '%s(%s, %s, %s, %s)' % (self.__class__.__name__, self.center, self.weight, self.mn, self.mx)
         tokens = TOKENIZER.split(''.join(convertOnesTo if b in ones else convertZerosTo if b in zeros else None for b in bits).strip(convertZerosTo))
-        lengths = sorted(len(token) for token in tokens[1:])
-        if not lengths:
-            lengths = [len(tokens[0])]
+        lengths = sorted(len(token) for token in tokens)
         (minLen, maxLen) = (lengths[0], lengths[-1])
         lenRange = float(maxLen - minLen)
         # Employ 3-means clustering
@@ -271,13 +274,21 @@ class Morse(object):
             else:
                 if groupBits:
                     code = ''.join(groupCode)
-                    ret.append((''.join(groupBits), code, self.decodeSymbol(code) if groupOK else ''))
+                    char = self.decodeSymbol(code) if groupOK else ''
+                    if char == ERROR and not ret:
+                        char = CONNECT
+                    ret.append((''.join(groupBits), code, char))
                     groupBits = []
                     groupCode = []
                     groupOK = True
                 if length: # not the last token
                     ret.append((token, SPACE if length <= maxDah else WORD_SPACE, '' if length <= maxDah else SPACE))
         return tuple(ret)
+
+    @staticmethod
+    def bitsToChars(bits):
+        chars = tuple(b[-1] for b in bits)
+        return ''.join((a + ' ' if len(a) > 1 and b != ' ' else a) for (a, b) in zip(chars, chain(chars[1:], [' '])))
 
     def messageToBits(self, message, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
         return self.codeToBits(self.encodeMessage(message, wrapForTransmission = wrapForTransmission), bitsPerDit, wrapForTransmission)
@@ -297,10 +308,10 @@ class MorseTest(TestCase):
         self.assertEqual(self.morse.decodeWord(codes), chars)
 
     def testBits(self):
-        bits = '1111111111110000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110000000000000001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
-        chars = 'Полученная телеграмма, труляля %% траляля!'
+        bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
+        chars = 'Полученная телеграмма, труляля-траляля!'
         self.assertEqual(self.morse.messageToBits(chars, 1, True), bits)
-        self.assertEqual(''.join(b[-1] for b in self.morse.parseBits(bits)), chars)
+        self.assertEqual(self.morse.bitsToChars(self.morse.parseBits(bits)), ' '.join((CONNECT, START, chars.upper(), END)))
 
     # ToDo: Create more tests!
 
