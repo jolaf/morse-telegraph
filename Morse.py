@@ -137,6 +137,7 @@ class Morse(object):
         return self.errorCode and len(code) > self.maxCodeLength and code == self.errorCode * (len(code) // len(self.errorCode))
 
     def encodeSymbol(self, char, defaultCode = None):
+        assert char, "Empty symbol"
         assert ' ' not in char, "Encoding spaces is not allowed: %r" % char
         if char == ERROR:
             return self.sendErrorCode
@@ -157,51 +158,57 @@ class Morse(object):
         return self.decoding[code] if defaultChar == EXCEPTION else self.decoding.get(code, defaultChar)
 
     def encodeWord(self, word, defaultCode = None):
+        assert word, "Empty word"
         assert ' ' not in word, "Encoding spaces in word is not allowed: %r" % word
         if isinstance(word, str):
             ret = self.encodeSymbol(word, '')
             if ret:
                 return ret
-        return SPACE.join(self.encodeSymbol(char, defaultCode) for char in word)
+        return SPACE.join(c for c in (self.encodeSymbol(char, defaultCode) for char in word) if c)
 
-    def decodeWord(self, codeWord, defaultChar = None):
+    def decodeWord(self, codeWord, defaultChar = None, processErrors = False):
         ret = []
         exception = None
         for code in codeWord.strip().split(SPACE) if isinstance(codeWord, str) else codeWord:
+            code = code.strip()
+            if not code:
+                continue
             try:
                 char = self.decodeSymbol(code, defaultChar)
             except KeyError as e:
+                if not processErrors:
+                    raise
                 if exception:
                     raise exception # pylint: disable=E0702
                 exception = e
                 continue
-            if char == ERROR:
+            if processErrors and char == ERROR:
                 exception = None
                 ret.clear()
             elif exception:
                 raise exception # pylint: disable=E0702
-            else:
-                ret.append(char)
+            elif char:
+                ret.append(char if len(char) == 1 else '%s%s ' % ('' if not ret or ret[-1][-1] == ' ' else ' ', char))
         if exception:
             raise exception # pylint: disable=E0702
-        return ''.join(ret)
+        return ''.join(ret).strip()
 
     def encodePhrase(self, phrase, defaultCode = None):
         return WORD_SPACE.join(self.encodeWord(word, defaultCode) for word in chain.from_iterable(p.strip().split() for p in ((phrase,) if isinstance(phrase, str) else phrase))) # pylint: disable=C0325
 
-    def decodePhrase(self, codePhrase, defaultChar = None):
+    def decodePhrase(self, codePhrase, defaultChar = None, processErrors = False):
         ret = []
         for codeWord in (cw for cw in (cw.strip() for cw in (codePhrase.split(WORD_SPACE)) if cw)):
             if ret and self.isError(codeWord.split()[0]):
                 ret.pop()
-            ret.append(self.decodeWord(codeWord, defaultChar))
+            ret.append(self.decodeWord(codeWord, defaultChar, processErrors))
         return ' '.join(ret)
 
     def encodeMessage(self, message, defaultCode = None, wrapForTransmission = False):
         return self.encodePhrase((START, message, END) if wrapForTransmission else message, defaultCode)
 
-    def decodeMessage(self, codePhrase, defaultChar = None):
-        return self.decodePhrase(codePhrase, defaultChar)
+    def decodeMessage(self, codePhrase, defaultChar = None, processErrors = False):
+        return self.decodePhrase(codePhrase, defaultChar, processErrors)
 
     def codeToBits(self, codePhrase, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
         ret = PAUSE.join(CODE_TO_BITS[c] for c in (chain(self.sendErrorCode * 2, '   ', codePhrase) if wrapForTransmission else codePhrase)) # pylint: disable=C0325
@@ -297,17 +304,109 @@ class MorseTest(TestCase):
     def setUp(self):
         self.morse = Morse()
 
-    def testEncode(self):
+    def testEncodeSymbol(self):
+        self.assertEqual(self.morse.encodeSymbol('А'), '.-')
+        self.assertEqual(self.morse.encodeSymbol('ё'), '.')
+        self.assertEqual(self.morse.encodeSymbol('ь'), '-..-')
+        self.assertEqual(self.morse.encodeSymbol(')'), '-.--.-')
+        self.assertEqual(self.morse.encodeSymbol('НЧЛ'), '-.-.-')
+        self.assertEqual(self.morse.encodeSymbol('ОШК'), '.......')
+        self.assertEqual(self.morse.encodeSymbol('НПН', ''), '')
+        self.assertEqual(self.morse.encodeSymbol('НПН', '.-'), '.-')
+        self.assertRaises(KeyError, self.morse.encodeSymbol, 'НПН', EXCEPTION)
+        self.assertRaises(AssertionError, self.morse.encodeSymbol, '')
+        self.assertRaises(KeyError, self.morse.encodeSymbol, '.......')
+        self.assertRaises(KeyError, self.morse.encodeSymbol, 'НПН')
+        self.assertRaises(AssertionError, self.morse.encodeSymbol, 'АБ ')
+
+    def testEncodeWord(self):
+        self.assertEqual(self.morse.encodeWord('А'), '.-')
+        self.assertEqual(self.morse.encodeWord('ё'), '.')
+        self.assertEqual(self.morse.encodeWord('ь'), '-..-')
+        self.assertEqual(self.morse.encodeWord(')'), '-.--.-')
+        self.assertEqual(self.morse.encodeWord('НЧЛ'), '-.-.-')
+        self.assertEqual(self.morse.encodeWord('ОШК'), '.......')
+        self.assertRaises(AssertionError, self.morse.encodeWord, '')
+        self.assertRaises(AssertionError, self.morse.encodeWord, 'АБ ')
+        self.assertRaises(AssertionError, self.morse.encodeWord, 'аб вг')
+        self.assertRaises(AssertionError, self.morse.encodeWord, 'абвг', '...-.')
+        self.assertRaises(AssertionError, self.morse.encodeWord, 'абвг', '. -')
+        self.assertEqual(self.morse.encodeWord('аБв'), '.- -... .--')
+        self.assertEqual(self.morse.encodeWord('АБВ', EXCEPTION), '.- -... .--')
+        self.assertEqual(self.morse.encodeWord(['а', 'Б', 'в']), '.- -... .--')
+        self.assertEqual(self.morse.encodeWord('НчЛ'), '-.-.-')
+        self.assertRaises(KeyError, self.morse.encodeWord, 'АБZ')
+        self.assertEqual(self.morse.encodeWord('АБZВ', ''), '.- -... .--')
+        self.assertEqual(self.morse.encodeWord('АБZВ', '.-.-.-'), '.- -... .-.-.- .--')
         chars = ['1', 'Д', '9', '?', 'Ч', 'Б', 'Ш', '.', 'Г', '4', 'Ь', 'Ъ', 'Й', 'О', ';', 'К', 'Ы', 'С', ':', 'А', 'М', '5', '(', ')', 'Ф', 'Ѳ', 'Л', '+', '3', 'И', 'I', 'Ѵ', 'КНЦ', 'У', 'НЧЛ', '-', '8', '!', 'Э', '7', '2', 'Е', 'Ё', 'Ѣ', 'Ж', 'Ю', 'Ц', "'", 'Н', '=', 'Щ', 'Х', '*', '6', 'П', '0', 'В', '/', '\\', 'Р', 'Я', 'Т', '"', 'З']
         codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- -..- .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--.- ..-. ..-. .-.. .-.-. ...-- .. .. .. ..-.- ..- -.-.- -....- ---.. --..-- ..-.. --... ..--- . . . ...- ..-- -.-. .----. -. -...- --.- .... .... -.... .--. ----- .-- -..-. -..-. .-. .-.- - .-..-. --..'
         self.assertEqual(self.morse.encodeWord(chars), codes)
 
-    def testDecode(self):
+    def testDecodeSymbol(self):
+        self.assertRaises(AssertionError, self.morse.decodeSymbol, '. -')
+        self.assertRaises(AssertionError, self.morse.decodeSymbol, '.=')
+        self.assertRaises(AssertionError, self.morse.decodeSymbol, '.-', 'АБВ')
+        self.assertRaises(AssertionError, self.morse.decodeSymbol, '.-', 'Z')
+        self.assertEqual(self.morse.decodeSymbol('.-'), 'А')
+        self.assertEqual(self.morse.decodeSymbol('.-', ''), 'А')
+        self.assertEqual(self.morse.decodeSymbol('.-', 'НПН'), 'А')
+        self.assertEqual(self.morse.decodeSymbol('.-', EXCEPTION), 'А')
+        self.assertEqual(self.morse.decodeSymbol('...-.', ''), '')
+        self.assertEqual(self.morse.decodeSymbol('...-.', 'НПН'), 'НПН')
+        self.assertRaises(KeyError, self.morse.decodeSymbol, '...-.', EXCEPTION)
+        self.assertEqual(self.morse.decodeSymbol('......'), '.')
+        self.assertEqual(self.morse.decodeSymbol('.......'), 'ОШК')
+        self.assertEqual(self.morse.decodeSymbol('........'), 'ОШК')
+        self.assertEqual(self.morse.decodeSymbol('..............................'), 'ОШК')
+        self.assertEqual(self.morse.decodeSymbol('..............-...............'), 'НПН')
+        self.assertEqual(self.morse.decodeSymbol('...-.'), 'НПН')
+        self.assertEqual(self.morse.decodeSymbol('..-.'), 'Ф')
+        self.assertEqual(self.morse.decodeSymbol('.--.-.'), 'Ь')
+
+    def testDecodeWord(self):
+        self.assertRaises(AssertionError, self.morse.decodeWord, '.=')
+        self.assertRaises(AssertionError, self.morse.decodeWord, '.-', 'АБВ')
+        self.assertRaises(AssertionError, self.morse.decodeWord, '.-', 'Z')
+        self.assertEqual(self.morse.decodeWord('.-'), 'А')
+        self.assertEqual(self.morse.decodeWord('.-', ''), 'А')
+        self.assertEqual(self.morse.decodeWord('.-', 'НПН'), 'А')
+        self.assertEqual(self.morse.decodeWord('.-', EXCEPTION), 'А')
+        self.assertEqual(self.morse.decodeWord('...-.', ''), '')
+        self.assertEqual(self.morse.decodeWord('...-.', 'НПН'), 'НПН')
+        self.assertRaises(KeyError, self.morse.decodeWord, '...-.', EXCEPTION)
+        self.assertEqual(self.morse.decodeWord('......'), '.')
+        self.assertEqual(self.morse.decodeWord('.......'), 'ОШК')
+        self.assertEqual(self.morse.decodeWord('........'), 'ОШК')
+        self.assertEqual(self.morse.decodeWord('..............................'), 'ОШК')
+        self.assertEqual(self.morse.decodeWord('..............-...............'), 'НПН')
+        self.assertEqual(self.morse.decodeWord('...-.'), 'НПН')
+        self.assertEqual(self.morse.decodeWord('..-.'), 'Ф')
+        self.assertEqual(self.morse.decodeWord('.--.-.'), 'Ь')
+        self.assertEqual(self.morse.decodeWord('.--.-.'), 'Ь')
+        self.assertEqual(self.morse.decodeWord('.-     -...'), 'АБ')
+        self.assertRaises(KeyError, self.morse.decodeWord, '.- ...-.', EXCEPTION)
+        self.assertEqual(self.morse.decodeWord('.- ...-. -...'), 'А НПН Б')
+        self.assertEqual(self.morse.decodeWord('.- ...-. ...-. -...'), 'А НПН НПН Б')
+        self.assertEqual(self.morse.decodeWord('.- ...-. ............... ...-. -...'), 'А НПН ОШК НПН Б')
+        self.assertEqual(self.morse.decodeWord('.- ...-. ............... ...-. -...', processErrors = True), 'НПН Б')
+        self.assertEqual(self.morse.decodeWord('.- ...-. ............... ...-. -...', ''), 'А ОШК Б')
+        self.assertRaises(KeyError, self.morse.decodeWord, '.- ...-. ............... ...-. -...', EXCEPTION)
+        self.assertRaises(KeyError, self.morse.decodeWord, '.- ...-. ....... ...-. -...', EXCEPTION, True)
+        self.assertEqual(self.morse.decodeWord('.- ...-. ........ -...', EXCEPTION, processErrors = True), 'Б')
         codes = '.---- -.. ----. ..--.. ---. -... ---- ...... --. ....- -..- --.-- .--.-. .--- --- -.-.-. -.- -.-- ... ---... .- -- ..... -.--.- -.--. ..-. .-.. .-.-. ...-- .. ..-.- ...-.- ..- -.-.- -....- ---.. --..-- ..-.. --... .-.-.- ..--- . ...- ..-- -.-. .----. -. -...- --.- .... -.... .--. ----- .-- -..-. .-. .-.- - .-..-. --..'
-        chars = '1Д9?ЧБШ.Г4ЬЬЬЙО;КЫС:АМ5((ФЛ+3ИКНЦКНЦУНЧЛ-8!Э7,2ЕЖЮЦ\'Н=ЩХ6П0В/РЯТ"З'
+        chars = '1Д9?ЧБШ.Г4ЬЬЬЙО;КЫС:АМ5((ФЛ+3И КНЦ КНЦ У НЧЛ -8!Э7,2ЕЖЮЦ\'Н=ЩХ6П0В/РЯТ"З'
         self.assertEqual(self.morse.decodeWord(codes), chars)
+        chars = '.--. --- .-.. ..- ---. . -. -. .- .-.-   - . .-.. . --. .-. ...-. -- -- .- .-.-.-   - .-. ..- .-.. -..-. ---.- .......... .-.- .-.. .-.- -....- - .-. .- .-.. .-.- .-.. .-.- --..--'
+        chars = 'ПОЛУЧЕННАЯ ТЕЛЕГР НПН ММА, ЯЛЯ-ТРАЛЯЛЯ!'
+        # ToDo: Adjust these last tests
 
     def testBits(self):
+        bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
+        chars = 'Полученная телеграмма, труляля-траляля!'
+        self.assertEqual(self.morse.messageToBits(chars, 1, True), bits)
+        self.assertEqual(self.morse.bitsToChars(self.morse.parseBits(bits)), ' '.join((CONNECT, START, chars.upper(), END)))
+
+    def testErrors(self):
         bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
         chars = 'Полученная телеграмма, труляля-траляля!'
         self.assertEqual(self.morse.messageToBits(chars, 1, True), bits)
