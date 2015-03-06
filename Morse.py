@@ -212,9 +212,9 @@ class Morse(object):
         ret = PAUSE.join(CODE_TO_BITS[c] for c in (chain(self.sendErrorCode * 2, '   ', codePhrase) if wrapForTransmission else codePhrase)) # pylint: disable=C0325
         return ''.join(c * bitsPerDit for c in ret)
 
-    def parseMessage(self, message, bitsPerDit = BITS_PER_DIT):
-        ret = []
-        for char in message.strip():
+    def charsToTriples(self, chars, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
+        ret = [(self.codeToBits(code, bitsPerDit), code, char) for (code, char) in ((self.sendErrorCode * 2, CONNECT), (self.encoding[START], START))] if wrapForTransmission else []
+        for char in (chars.strip() if isinstance(chars, str) else chars): # pylint: disable=C0325
             if char == SPACE:
                 ret.append((self.codeToBits(WORD_SPACE + SPACE, bitsPerDit), WORD_SPACE, SPACE))
             else:
@@ -225,7 +225,7 @@ class Morse(object):
                 ret.append((bits, code, self.decodeSymbol(code)))
         return tuple(ret)
 
-    def parseBits(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
+    def bitsToTriples(self, bits, zeros = frozenset('0._ '), ones = frozenset('1|-=+*^'), convertZerosTo = PAUSE, convertOnesTo = DIT):
         class Cluster(object):
             def __init__(self, center, weight, mn, mx):
                 self.center = center
@@ -291,19 +291,20 @@ class Morse(object):
         return tuple(ret)
 
     @staticmethod
-    def bitsToChars(bits):
-        chars = tuple(b[-1] for b in bits)
+    def triplesToChars(triples):
+        chars = tuple(t[-1] for t in triples)
         return ''.join((a + ' ' if len(a) > 1 and b != ' ' else a) for (a, b) in zip(chars, chain(chars[1:], [' '])))
 
-    def messageToBits(self, message, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
-        return self.codeToBits(self.encodeMessage(message, wrapForTransmission = wrapForTransmission), bitsPerDit, wrapForTransmission)
+    def charsToBits(self, chars, bitsPerDit = BITS_PER_DIT, wrapForTransmission = False):
+        return self.codeToBits(self.encodeMessage(chars, None, wrapForTransmission), bitsPerDit, wrapForTransmission)
 
-class MorseTest(TestCase):
-    def setUp(self):
-        self.morse = Morse()
+class MorseTest(TestCase, Morse):
+    def __init__(self, *args, **kwargs):
+        TestCase.__init__(self, *args, **kwargs)
+        Morse.__init__(self)
 
     def testEncodeSymbol(self, f = None):
-        f = f or self.morse.encodeSymbol
+        f = f or self.encodeSymbol
         self.assertEqual(f('А'), '.-')
         self.assertEqual(f('ё'), '.')
         self.assertEqual(f('ь'), '-..-')
@@ -319,7 +320,7 @@ class MorseTest(TestCase):
         self.assertRaises(AssertionError, f, 'АБ ')
 
     def testEncodeWord(self, f = None):
-        f = f or self.morse.encodeWord
+        f = f or self.encodeWord
         self.assertEqual(f('А'), '.-')
         self.assertEqual(f('ё'), '.')
         self.assertEqual(f('ь'), '-..-')
@@ -343,7 +344,7 @@ class MorseTest(TestCase):
         self.assertEqual(f(chars), codes)
 
     def testEncodePhrase(self, f = None):
-        f = f or self.morse.encodePhrase
+        f = f or self.encodePhrase
         self.assertEqual(f('А'), '.-')
         self.assertEqual(f('ё'), '.')
         self.assertEqual(f('ь'), '-..-')
@@ -369,7 +370,7 @@ class MorseTest(TestCase):
         self.assertEqual(f(chars), codes)
 
     def testEncodeMessage(self, f = None):
-        f = f or self.morse.encodeMessage
+        f = f or self.encodeMessage
         self.testEncodePhrase(f)
         self.assertEqual(f('ь', None, True), '-.-.-   -..-   ..-.-')
         self.assertEqual(f('аБвГ', None, True), '-.-.-   .- -... .-- --.   ..-.-')
@@ -377,7 +378,7 @@ class MorseTest(TestCase):
         self.assertEqual(f(('аБ', 'в', 'Г'), None, True), '-.-.-   .- -...   .--   --.   ..-.-')
 
     def testDecodeSymbol(self, f = None):
-        f = f or self.morse.decodeSymbol
+        f = f or self.decodeSymbol
         self.assertRaises(AssertionError, f, '. -')
         self.assertRaises(AssertionError, f, '.=')
         self.assertRaises(AssertionError, f, '.-', 'АБВ')
@@ -399,7 +400,7 @@ class MorseTest(TestCase):
         self.assertEqual(f('.--.-.'), 'Ь')
 
     def testDecodeWord(self, f = None):
-        f = f or self.morse.decodeWord
+        f = f or self.decodeWord
         self.assertRaises(AssertionError, f, '.=')
         self.assertRaises(AssertionError, f, '.-', 'АБВ')
         self.assertRaises(AssertionError, f, '.-', 'Z')
@@ -420,7 +421,7 @@ class MorseTest(TestCase):
         self.assertEqual(f('...-.'), 'НПН')
         self.assertEqual(f('..-.'), 'Ф')
         self.assertEqual(f('.--.-.'), 'Ь')
-        self.assertEqual(f('.-     -...' if f is self.morse.decodeWord else '.- -...'), 'АБ')
+        self.assertEqual(f('.-     -...' if f is self.decodeWord else '.- -...'), 'АБ')
         self.assertRaises(KeyError, f, '.- ...-.', EXCEPTION)
         self.assertEqual(f('.- ...-. -...'), 'А НПН Б')
         self.assertEqual(f('.- ...-. ...-. -...'), 'А НПН НПН Б')
@@ -437,7 +438,7 @@ class MorseTest(TestCase):
         self.assertEqual(f(codes), chars)
 
     def testDecodePhrase(self, f = None):
-        f = f or self.morse.decodePhrase
+        f = f or self.decodePhrase
         self.testDecodeWord(f)
         codes = '      .--. --- .-.. ..- ---. . -. -. .- .-.-   - . .-.. . --. .-. .- -- -- .- .-.-.-   - .-. ..- .-.. -..-- ---.- .......... - .-. ..- .-.. .-.- .-.. .-.- -....- - .-. .- .-.. .-.- .-.. .-.- --..--   '
         self.assertEqual(f(codes), 'ПОЛУЧЕННАЯ ТЕЛЕГРАММА, ТРУЛ НПН НПН ОШК ТРУЛЯЛЯ-ТРАЛЯЛЯ!')
@@ -453,22 +454,33 @@ class MorseTest(TestCase):
         self.assertRaises(KeyError, f, codes, EXCEPTION)
 
     def testDecodeMessage(self, f = None):
-        f = f or self.morse.decodeMessage
+        f = f or self.decodeMessage
         self.testDecodePhrase(f)
 
-    def testBits(self):
-        bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
-        chars = 'Полученная телеграмма, труляля-траляля!'
-        self.assertEqual(self.morse.messageToBits(chars, 1, True), bits)
-        self.assertEqual(self.morse.bitsToChars(self.morse.parseBits(bits)), ' '.join((CONNECT, START, chars.upper(), END)))
+    def testCodeToBits(self, f = None):
+        f = f or self.codeToBits
+        self.assertEqual(f('.- -...', ), '111000111111111000000000111111111000111000111000111')
+        codes = '.--. --- .-.. ..- ---. . -. -. .- .-.-   - . .-.. . --. .-. .- -- -- .- .-.-.-   - .-. ..- .-.. .-.- .-.. .-.- -....- - .-. .- .-.. .-.- .-.. .-.- --..--'
+        bits = '101110111010001110111011100010111010100010101110001110111011101000100011101000111010001011100010111010111000000011100010001011101010001000111011101000101110100010111000111011100011101110001011100010111010111010111000000011100010111010001010111000101110101000101110101110001011101010001011101011100011101010101011100011100010111010001011100010111010100010111010111000101110101000101110101110001110111010101110111'
+        self.assertEqual(f(codes, 1), bits)
+        bits = '1010101010101010101010101010000000101110111010001110111011100010111010100010101110001110111011101000100011101000111010001011100010111010111000000011100010001011101010001000111011101000101110100010111000111011100011101110001011100010111010111010111000000011100010111010001010111000101110101000101110101110001011101010001011101011100011101010101011100011100010111010001011100010111010100010111010111000101110101000101110101110001110111010101110111'
+        self.assertEqual(f(codes, 1, True), bits)
+        bits = '111000111000111000111000111000111000111000111000111000111000111000111000111000111000000000000000000000111000111111111000111111111000111000000000111111111000111111111000111111111000000000111000111111111000111000111000000000111000111000111111111000000000111111111000111111111000111111111000111000000000111000000000111111111000111000000000111111111000111000000000111000111111111000000000111000111111111000111000111111111000000000000000000000111111111000000000111000000000111000111111111000111000111000000000111000000000111111111000111111111000111000000000111000111111111000111000000000111000111111111000000000111111111000111111111000000000111111111000111111111000000000111000111111111000000000111000111111111000111000111111111000111000111111111000000000000000000000111111111000000000111000111111111000111000000000111000111000111111111000000000111000111111111000111000111000000000111000111111111000111000111111111000000000111000111111111000111000111000000000111000111111111000111000111111111000000000111111111000111000111000111000111000111111111000000000111111111000000000111000111111111000111000000000111000111111111000000000111000111111111000111000111000000000111000111111111000111000111111111000000000111000111111111000111000111000000000111000111111111000111000111111111000000000111111111000111111111000111000111000111111111000111111111'
+        self.assertEqual(f(codes, wrapForTransmission = True), bits)
+        self.assertRaises(KeyError, f, '._-')
 
-    def testErrors(self):
-        bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
+    def testTriples(self):
         chars = 'Полученная телеграмма, труляля-траляля!'
-        self.assertEqual(self.morse.messageToBits(chars, 1, True), bits)
-        self.assertEqual(self.morse.bitsToChars(self.morse.parseBits(bits)), ' '.join((CONNECT, START, chars.upper(), END)))
-
-    # ToDo: Create more tests!
+        bits = '101110111010001110111011100010111010100010101110001110111011101000100011101000111010001011100010111010111000000011100010001011101010001000111011101000101110100010111000111011100011101110001011100010111010111010111000000011100010111010001010111000101110101000101110101110001011101010001011101011100011101010101011100011100010111010001011100010111010100010111010111000101110101000101110101110001110111010101110111'
+        triples = self.charsToTriples(chars, 1)
+        self.assertEqual(self.bitsToTriples(bits), triples)
+        self.assertEqual(self.charsToBits(chars, 1), bits)
+        self.assertEqual(self.triplesToChars(triples), ''.join(chars.upper()))
+        bits = '1010101010101010101010101010000000111010111010111000000010111011101000111011101110001011101010001010111000111011101110100010001110100011101000101110001011101011100000001110001000101110101000100011101110100010111010001011100011101110001110111000101110001011101011101011100000001110001011101000101011100010111010100010111010111000101110101000101110101110001110101010101110001110001011101000101110001011101010001011101011100010111010100010111010111000111011101010111011100000001010111010111'
+        triples = self.charsToTriples(chars, 1, True)
+        self.assertEqual(self.bitsToTriples(bits), triples)
+        self.assertEqual(self.charsToBits(chars, 1, True), bits)
+        self.assertEqual(self.triplesToChars(triples), ' '.join((CONNECT, START, chars.upper(), END)))
 
 if __name__ == '__main__':
     main()

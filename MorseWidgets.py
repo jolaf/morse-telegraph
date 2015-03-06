@@ -211,7 +211,7 @@ class MessageFrame(QFrame):
         else:
             index = self.HEAD_SIZE + 1 if reader is None else self.parentLayout.count() - self.TAIL_SIZE
             self.bits = bits
-            self.updateBits(self.morse.parseBits(bits), text is None)
+            self.updateBits(self.morse.bitsToTriples(bits), text is None)
         self.parentLayout.insertWidget(index, self)
         self.parentLayout.setStretch(index, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
@@ -237,7 +237,7 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
         self.bitsGridLayout.setColumnStretch(c, last)
 
-    def updateBits(self, bits, saveText = False):
+    def updateBits(self, triples, saveText = False):
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
         QObjectCleanupHandler().add(self.bitsGridLayout) # pylint: disable=E0203
@@ -245,7 +245,7 @@ class MessageFrame(QFrame):
         self.addToken(first = True)
         if saveText:
             text = []
-        for (bits, code, char) in bits:
+        for (bits, code, char) in triples:
             self.addToken(bits, code, char)
             if saveText:
                 text.append(char)
@@ -270,9 +270,9 @@ class MessageFrame(QFrame):
     def doUpdateText(self):
         self.textUpdateEventCounter -= 1
         if self.textUpdateEventCounter == 0:
-            bits = self.morse.parseMessage(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = ')))
-            self.bits = ''.join(b[0] for b in bits)
-            self.updateBits(bits)
+            triples = self.morse.charsToTriples(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = ')))
+            self.bits = ''.join(t[0] for t in triples)
+            self.updateBits(triples)
 
     def dataStr(self):
         state = self.RECEIVED if self.state is self.EDIT else self.state
@@ -323,13 +323,13 @@ class MessageFrame(QFrame):
         self.messageTextEdit.setFocus()
 
     def sendOutgoing(self):
-        self.sendCallback(self.morse.messageToBits(self.messageTextEdit.toPlainText(), True))
+        self.sendCallback(self.morse.charsToBits(self.messageTextEdit.toPlainText(), True))
         self.setState(self.SENT)
         self.setTimeStamp(datetime.now())
         MessageFrame()
 
     def printMessage(self):
-        self.printCallback(self.morse.messageToBits(self.messageTextEdit.toPlainText(), True))
+        self.printCallback(self.morse.charsToBits(self.messageTextEdit.toPlainText(), True))
 
     def deleteSaved(self):
         ret = QMessageBox.question(self, "Удалить телеграмму?", "Вы уверены, что хотите удалить данную телеграмму?")
