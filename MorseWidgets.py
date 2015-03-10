@@ -211,7 +211,7 @@ class MessageFrame(QFrame):
         else:
             index = self.HEAD_SIZE + 1 if reader is None else self.parentLayout.count() - self.TAIL_SIZE
             self.bits = bits
-            self.updateBits(self.morse.bitsToTriples(bits), text is None)
+            self.updateTriples(self.morse.bitsToTriples(bits), text is None)
         self.parentLayout.insertWidget(index, self)
         self.parentLayout.setStretch(index, 0)
         self.parentLayout.setStretch(self.parentLayout.count() - self.TAIL_SIZE, 1)
@@ -237,22 +237,18 @@ class MessageFrame(QFrame):
         self.bitsGridLayout.addWidget(CharLabel(self, char), 2, c)
         self.bitsGridLayout.setColumnStretch(c, last)
 
-    def updateBits(self, triples, saveText = False):
+    def updateTriples(self, triples, saveText = False):
         for widget in self.bitsWidget.findChildren(QLabel):
             widget.setParent(None)
         QObjectCleanupHandler().add(self.bitsGridLayout) # pylint: disable=E0203
         self.bitsGridLayout = BitsGridLayout(self.bitsWidget)
         self.addToken(first = True)
-        if saveText:
-            text = []
         for (bits, code, char) in triples:
             self.addToken(bits, code, char)
-            if saveText:
-                text.append(char)
         self.addToken(last = True)
         self.bitsWidget.setLayout(self.bitsGridLayout)
         if saveText:
-            self.messageTextEdit.setPlainText(''.join(text))
+            self.messageTextEdit.setPlainText(self.morse.triplesToChars(triples, True, True))
 
     def updateText(self, text):
         if self.state is self.OUTGOING:
@@ -272,7 +268,7 @@ class MessageFrame(QFrame):
         if self.textUpdateEventCounter == 0:
             triples = self.morse.charsToTriples(self.SPACE_CUTTER.sub(' ', self.textToUpdate.strip().replace('\n', ' = ')))
             self.bits = ''.join(t[0] for t in triples)
-            self.updateBits(triples)
+            self.updateTriples(triples)
 
     def dataStr(self):
         state = self.RECEIVED if self.state is self.EDIT else self.state
