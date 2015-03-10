@@ -5,7 +5,6 @@
 from collections import deque
 from functools import partial
 from getopt import getopt
-from locale import setlocale, LC_ALL
 from logging import getLogger, getLoggerClass, setLoggerClass, FileHandler, Formatter, Handler, INFO, NOTSET
 from sys import argv, exit # pylint: disable=W0622
 from time import sleep, time
@@ -13,7 +12,7 @@ from traceback import format_exc
 
 try:
     from PyQt5 import uic
-    from PyQt5.QtCore import QByteArray, QCoreApplication, QDateTime, QObject, QSettings, QTranslator, pyqtSignal
+    from PyQt5.QtCore import QByteArray, QCoreApplication, QDateTime, QObject, QSettings, pyqtSignal
     from PyQt5.QtWidgets import QApplication, QDesktopWidget, QDialog, QLabel, QMessageBox, QMainWindow
 except ImportError as ex:
     raise ImportError("%s: %s\n\nPlease install PyQt5 v5.2.1 or later: http://riverbankcomputing.com/software/pyqt/download5\n" % (ex.__class__.__name__, ex))
@@ -21,15 +20,7 @@ except ImportError as ex:
 from UARTTextProtocol import Command, COMMAND_MARKER
 from UARTTextCommands import ackResponse, morseBeepCommand, morseTxCommand, morsePrintCommand, morseRxResponse
 from SerialPort import SerialPort, DT, TIMEOUT
-from MorseWidgets import MessageFrame
-
-#
-# ToDo
-# Fix segmentation faults - do not hold references to Qt objects
-# When decoding incoming message, add indication of СОЕД, НЧЛ, КНЦ, НПР, ОШК
-# Adequately decode incoming message UART commands
-# Verify operation on Windows
-#
+from MorseWidgets import MessageFrame, YesNoMessageBox
 
 LONG_DATETIME_FORMAT = 'yyyy.MM.dd hh:mm:ss'
 
@@ -191,10 +182,9 @@ class MorseControl(QMainWindow):
             self.show()
 
     def askForExit(self):
-        if True: # ToDo: Make a proper check for unsent message
+        if not MessageFrame.hasUnsaved():
             return True
-        messageBox = QMessageBox(QMessageBox.Question, "Редактируемая телеграмма не была отправлена.",
-                "Вы уверены, что хотите выйти?", QMessageBox.Yes | QMessageBox.No, self)
+        messageBox = YesNoMessageBox("Телеграмма не отправлена", "Вы уверены, что хотите выйти?", self)
         return messageBox.exec_() == QMessageBox.Yes
 
     def processConnect(self, pong):
@@ -261,13 +251,13 @@ class MorseControl(QMainWindow):
 
     @staticmethod
     def saveData():
-        with open(DATA_FILE_NAME, 'w', newline = '\r\n') as dataFile, open(TEXT_FILE_NAME, 'w', newline = '\r\n') as textFile:
+        with open(DATA_FILE_NAME, 'w', encoding='utf-8', newline = '\r\n') as dataFile, open(TEXT_FILE_NAME, 'w', encoding='utf-8', newline = '\r\n') as textFile:
             MessageFrame.writeData(dataFile, textFile)
 
     @staticmethod
     def loadData():
         try:
-            dataFile = open(DATA_FILE_NAME)
+            dataFile = open(DATA_FILE_NAME, encoding='utf-8')
         except OSError:
             dataFile = None
         MessageFrame.readData(dataFile)
@@ -328,10 +318,6 @@ class MorseControl(QMainWindow):
 if __name__ == '__main__': # Not using main() function per recommendation for PyQt5:
     try:                   # http://pyqt.sourceforge.net/Docs/PyQt5/pyqt4_differences.html#object-destruction-on-exit
         application = QApplication(argv)
-        setlocale(LC_ALL, ('ru_RU', 'UTF-8')) # doesn't work on Ubuntu if performed earlier
-        translator = QTranslator()
-        if translator.load('qt_ru'):
-            application.installTranslator(translator)
         morseControl = MorseControl(argv[1:]) # retain reference
         retCode = application.exec_()
         application.deleteLater()

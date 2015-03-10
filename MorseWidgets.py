@@ -26,6 +26,12 @@ def widgets(layout, headerSize = 0, tailSize = 0): # generator
     for i in range(headerSize, layout.count() - tailSize):
         yield layout.itemAt(i).widget()
 
+class YesNoMessageBox(QMessageBox):
+    def __init__(self, title, text, parent):
+        QMessageBox.__init__(self, QMessageBox.Question, title, text, QMessageBox.Yes | QMessageBox.No, parent)
+        self.button(self.Yes).setText("Да")
+        self.button(self.No).setText("Нет")
+
 class ConsoleEdit(QLineEdit):
     def configure(self, callback):
         self.setStatusTip(self.placeholderText())
@@ -294,6 +300,10 @@ class MessageFrame(QFrame):
             widget.messageTextEdit.updateSize()
 
     @classmethod
+    def hasUnsaved(cls):
+        return bool(next(widgets(cls.parentLayout, cls.HEAD_SIZE, cls.TAIL_SIZE)).messageTextEdit.toPlainText().strip())
+
+    @classmethod
     def writeData(cls, dataFile, textFile):
         dataFile.write('# MorseControl data file')
         textFile.write('# MorseControl text file')
@@ -328,8 +338,8 @@ class MessageFrame(QFrame):
         self.printCallback(self.morse.charsToBits(self.messageTextEdit.toPlainText(), True))
 
     def deleteSaved(self):
-        ret = QMessageBox.question(self, "Удалить телеграмму?", "Вы уверены, что хотите удалить данную телеграмму?")
-        if ret == QMessageBox.Yes:
+        messageBox = YesNoMessageBox("Удалить телеграмму?", "Вы уверены, что хотите удалить данную телеграмму?", self)
+        if messageBox.exec_() == messageBox.Yes:
             self.setParent(None)
 
     def editReceived(self):

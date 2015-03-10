@@ -7,7 +7,7 @@
   </property>
   <property name="windowIcon">
    <iconset>
-    <normaloff>images/icon.png</normaloff>images/icon.png</iconset>
+    <normaloff>icon.png</normaloff>icon.png</iconset>
   </property>
   <property name="modal">
    <bool>true</bool>
@@ -25,7 +25,7 @@
       <enum>QFrame::Box</enum>
      </property>
      <property name="pixmap">
-      <pixmap>images/icon.png</pixmap>
+      <pixmap>icon.png</pixmap>
      </property>
      <property name="scaledContents">
       <bool>true</bool>
